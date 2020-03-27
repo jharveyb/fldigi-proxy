@@ -1,6 +1,7 @@
 #!/usr/bin/python3.7
 
 from time import sleep
+import argparse
 import pyfldigi
 
 # Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
@@ -14,17 +15,20 @@ class fl_instance:
     tcp_port = 7342
     start_delay = 5
     stop_delay = 3
-    poll_delay = 0.1
+    poll_delay = 0.05
 
     # we assume no port collisions / no other instance of fldigi is running
     # TODO: check for other fldigi instances before starting
-    def __init__(self, host=host_ip, port=xml_port, headless=False, wfall_only=False, start_delay=start_delay):
+    def __init__(self, nodaemon=False, host=host_ip, port=xml_port, headless=False,
+        wfall_only=False, start_delay=start_delay):
         self.host_ip = host
-        self.xml_port = port
+        if (port != None):
+            self.xml_port = port
         self.start_delay = start_delay
         self.fl_client = pyfldigi.Client(hostname=self.host_ip, port=self.xml_port)
         self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
-        self.fl_app.start(headless=headless, wfall_only=wfall_only)
+        if (nodaemon == False):
+            self.fl_app.start(headless=headless, wfall_only=wfall_only)
         sleep(self.start_delay)
 
     def port_info(self):
@@ -85,7 +89,20 @@ test_strings = ["TEST TEST TEST", "\n", "The Times 03/Jan/2009 Chancellor on bri
     "\n", "The computer can be used as a tool to liberate and protect people, rather than to control them.", "\n"]
 test_bytes = [str.encode(string) for string in test_strings]
 
-fl_main = fl_instance()
-print(fl_main.version())
-fl_main.port_info()
+def main():
+    parser = argparse.ArgumentParser(description='Talk to fldigi.')
+    parser.add_argument("--nodaemon", help="attach to an fldigi process", action="store_true")
+    parser.add_argument('--xml', type=int, help="XML port")
+    parser.add_argument('--nohead', help='run fldigi headless', action="store_true")
+    args = parser.parse_args()
+    print("args:", args.nodaemon, args.xml, args.nohead)
+    fl_main = fl_instance(nodaemon=args.nodaemon, port=args.xml, headless=args.nohead)
+    print(fl_main.version())
+    fl_main.port_info()
+    sleep(fl_main.poll_delay)
+    fl_main.modem_info()
+    sleep(fl_main.poll_delay)
 fl_main.stop()
+
+if __name__ == "__main__":
+    main()
