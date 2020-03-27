@@ -39,6 +39,7 @@ class fl_instance:
 
     # send content manually vs. using main.send; assume we are in RX mode when calling
     def send(self, tx_msg):
+        self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
         self.fl_client.main.tx()
         self.fl_client.text.add_tx(tx_msg)
@@ -65,6 +66,26 @@ class fl_instance:
                         tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
         self.fl_client.main.abort()
         self.fl_client.main.rx()
+
+    # received content is in bytes
+    def receive(self):
+        rx_msg=bytes()
+        rx_fragment = bytes()
+        # read loop that breaks on newline
+        while (True):
+            sleep(self.poll_delay)
+            rx_fragment = self.fl_client.text.get_rx_data()
+            #print(rx_fragment)
+            if (rx_fragment != b''):
+                if (rx_fragment == b'\n'):
+                    break
+                elif (rx_fragment == b'\r'):
+                    continue
+                # not sure why we have to double check this
+                elif (isinstance(rx_fragment, bytes)):
+                    rx_msg += rx_fragment
+        self.fl_client.text.clear_rx()
+        return rx_msg
 
     def modem_info(self):
         print("bandwidth", self.fl_client.rig.bandwidth, "frequency", self.fl_client.rig.frequency,
