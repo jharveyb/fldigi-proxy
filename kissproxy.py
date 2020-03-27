@@ -14,9 +14,7 @@ class fl_instance:
     tcp_port = 7342
     start_delay = 5
     stop_delay = 3
-    poll_delay = 0.01
-    send_minimum = poll_delay * 100
-    send_factor = 30
+    poll_delay = 0.1
 
     # we assume no port collisions / no other instance of fldigi is running
     # TODO: check for other fldigi instances before starting
@@ -35,21 +33,26 @@ class fl_instance:
     def version(self):
         return self.fl_client.version
 
-    # send content manually vs. using send; assume we are in RX mode
+    # send content manually vs. using main.send; assume we are in RX mode when calling
     def send(self, tx_msg=[]):
         self.fl_client.text.clear_tx()
         self.fl_client.main.tx()
         self.fl_client.text.add_tx(tx_msg)
-        # hacky wait for tx to finish, depends on mode + encoding
-        # ideally we would check the tx_data but then we also have to reassemble the content there
-        sleep(self.send_minimum)
-        len_wait = self.poll_delay * len(tx_msg) * self.send_factor
-        # handle longer messages
-        if (len_wait > self.send_minimum):
-            sleep(len_wait)
+        # Poll and check TX'd data; reassemble & end send once msg made it out
+        tx_confirm_msg = ''
+        tx_confirm_fragment = []
+        print("Sending:", tx_msg)
+        while (tx_msg != tx_confirm_msg):
+            sleep(self.poll_delay)
+            tx_confirm_fragment = self.fl_client.text.get_tx_data()
+            if (tx_confirm_fragment != ''):
+                # special strings
+                if (tx_confirm_fragment.decode("utf-8") == '\n'):
+                    break
+                else:
+                    tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
         self.fl_client.main.abort()
         self.fl_client.main.rx()
-        print("send finished!")
 
     def modem_info(self):
         print("bandwidth", self.fl_client.rig.bandwidth, "frequency", self.fl_client.rig.frequency,
