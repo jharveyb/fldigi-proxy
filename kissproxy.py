@@ -34,13 +34,18 @@ class fl_instance:
         return self.fl_client.version
 
     # send content manually vs. using main.send; assume we are in RX mode when calling
-    def send(self, tx_msg=[]):
+    def send(self, tx_msg):
         self.fl_client.text.clear_tx()
         self.fl_client.main.tx()
         self.fl_client.text.add_tx(tx_msg)
         # Poll and check TX'd data; reassemble & end send once msg made it out
-        tx_confirm_msg = ''
-        tx_confirm_fragment = []
+        byteflag = isinstance(tx_msg, bytes)
+        if (byteflag):
+            tx_confirm_msg = bytes()
+            tx_confirm_fragment = bytes()
+        else:
+            tx_confirm_msg = ''
+            tx_confirm_fragment = []
         print("Sending:", tx_msg)
         while (tx_msg != tx_confirm_msg):
             sleep(self.poll_delay)
@@ -50,7 +55,10 @@ class fl_instance:
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
                     break
                 else:
-                    tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
+                    if (byteflag):
+                        tx_confirm_msg += tx_confirm_fragment
+                    else:
+                        tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
         self.fl_client.main.abort()
         self.fl_client.main.rx()
 
@@ -75,6 +83,7 @@ class fl_instance:
 
 test_strings = ["TEST TEST TEST", "\n", "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.", 
     "\n", "The computer can be used as a tool to liberate and protect people, rather than to control them.", "\n"]
+test_bytes = [str.encode(string) for string in test_strings]
 
 fl_main = fl_instance()
 print(fl_main.version())
