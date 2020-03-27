@@ -70,6 +70,9 @@ class fl_instance:
         sleep(self.stop_delay)
         self.fl_app.kill()
 
+test_strings = ["TEST TEST TEST", "\n", "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.", 
+    "\n", "The computer can be used as a tool to liberate and protect people, rather than to control them.", "\n"]
+
 fl_main = fl_instance()
 print(fl_main.version())
 fl_main.port_info()
