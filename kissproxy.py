@@ -123,7 +123,17 @@ def main():
     sleep(fl_main.poll_delay)
     fl_main.modem_info()
     sleep(fl_main.poll_delay)
-fl_main.stop()
+
+    # running instance started with custom config
+    if (args.nodaemon):
+        while (True):
+            print(fl_main.receive())
+    # child of this script
+    else:
+        for tester in test_bytes:
+            fl_main.send(tester)
+        sleep(fl_main.poll_delay)
+        fl_main.stop()
 
 if __name__ == "__main__":
     main()
