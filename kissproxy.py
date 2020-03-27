@@ -51,6 +51,19 @@ class fl_instance:
         self.fl_client.main.rx()
         print("send finished!")
 
+    def modem_info(self):
+        print("bandwidth", self.fl_client.rig.bandwidth, "frequency", self.fl_client.rig.frequency,
+            "mode", self.fl_client.rig.mode, "name", self.fl_client.rig.name)
+
+    def modem_modify(self, bw='', freq=0.0, mode='', name=''):
+        if (bw != ''):
+            self.fl_client.rig.bandwidth = bw
+        if (freq != 0.0):
+            self.fl_client.rig.frequency = freq
+        if (mode != ''):
+            self.fl_client.rig.mode = mode
+        if (name != ''):
+                self.fl_client.rig.name = name
 
     def stop(self):
         self.fl_client.terminate(save_options=True)
