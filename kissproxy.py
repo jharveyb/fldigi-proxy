@@ -14,6 +14,9 @@ class fl_instance:
     tcp_port = 7342
     start_delay = 5
     stop_delay = 3
+    poll_delay = 0.01
+    send_minimum = poll_delay * 100
+    send_factor = 30
 
     # we assume no port collisions / no other instance of fldigi is running
     # TODO: check for other fldigi instances before starting
@@ -31,6 +34,22 @@ class fl_instance:
 
     def version(self):
         return self.fl_client.version
+
+    # send content manually vs. using send; assume we are in RX mode
+    def send(self, tx_msg=[]):
+        self.fl_client.text.clear_tx()
+        self.fl_client.main.tx()
+        self.fl_client.text.add_tx(tx_msg)
+        # hacky wait for tx to finish, depends on mode + encoding
+        # ideally we would check the tx_data but then we also have to reassemble the content there
+        sleep(self.send_minimum)
+        len_wait = self.poll_delay * len(tx_msg) * self.send_factor
+        # handle longer messages
+        if (len_wait > self.send_minimum):
+            sleep(len_wait)
+        self.fl_client.main.abort()
+        self.fl_client.main.rx()
+        print("send finished!")
 
 
     def stop(self):
