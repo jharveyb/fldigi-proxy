@@ -45,31 +45,25 @@ class fl_instance:
         self.fl_client.text.add_tx(tx_msg)
         # Poll and check TX'd data; reassemble & end send once msg made it out
         byteflag = isinstance(tx_msg, bytes)
-        if (byteflag):
-            tx_confirm_msg = bytes()
-            tx_confirm_fragment = bytes()
-        else:
-            tx_confirm_msg = ''
-            tx_confirm_fragment = []
+        tx_confirm_msg = ''
+        tx_confirm_fragment = []
         print("Sending:", tx_msg)
         while (tx_msg != tx_confirm_msg):
             sleep(self.poll_delay)
             tx_confirm_fragment = self.fl_client.text.get_tx_data()
             if (tx_confirm_fragment != ''):
-                # special strings
+                # sends terminate with \n; base64 guarantees this doesn't appear in our message
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
                     break
                 else:
-                    if (byteflag):
-                        tx_confirm_msg += tx_confirm_fragment
-                    else:
-                        tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
+                    tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
+        print("Sent:", tx_confirm_msg)
         self.fl_client.main.abort()
         self.fl_client.main.rx()
 
     # received content is in bytes
     def receive(self):
-        rx_msg=bytes()
+        rx_msg = bytes()
         rx_fragment = bytes()
         # read loop that breaks on newline
         while (True):
