@@ -10,7 +10,7 @@ Proxy between TCP/IP sockets (or raw text) and fldigi (HAM radio controller)
 
 ## Setup (Tested only on Debian testing)
 
-* Install Python 3.7 (should also work with 3.8+ but not tested)
+* Install Python 3.8 (should work on any python3 version but not tested)
 * Install pavucontrol (to set sink & source for fldigi)
 * Install fldigi (present in most distribution repos, or check <http://www.w1hkj.com/>)
 * Use pip3 to install pyfldigi (<https://pythonhosted.org/pyfldigi/index.html>)
