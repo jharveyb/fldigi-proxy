@@ -120,14 +120,17 @@ def main():
     parser.add_argument("--nodaemon", help="attach to an fldigi process", action="store_true")
     parser.add_argument('--xml', type=int, help="XML port")
     parser.add_argument('--nohead', help='run fldigi headless', action="store_true")
+    parser.add_argument('--freq', type=float, help='set frequency in kHz')
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead)
+    print("args:", args.nodaemon, args.xml, args.nohead, args.freq)
     fl_main = fl_instance(nodaemon=args.nodaemon, port=args.xml, headless=args.nohead)
     print(fl_main.version())
     fl_main.port_info()
     sleep(fl_main.poll_delay)
     fl_main.modem_info()
     sleep(fl_main.poll_delay)
+    if (args.freq != None):
+        fl_main.modem_modify(freq=(args.freq*1e6))
 
     # running instance started with custom config
     if (args.nodaemon):
