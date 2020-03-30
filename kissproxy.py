@@ -3,6 +3,7 @@
 from time import sleep
 import argparse
 import pyfldigi
+import codecs
 
 # Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
 # over a TCP/IP socket
