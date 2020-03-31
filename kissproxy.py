@@ -19,8 +19,8 @@ class fl_instance:
     stop_delay = 3
     poll_delay = 0.05
 
-    # we assume no port collisions / no other instance of fldigi is running
-    # TODO: check for other fldigi instances before starting
+    # we assume no port collisions for KISS, ARQ, or XMLRPC ports
+    # TODO: check ports before starting
     def __init__(self, nodaemon=False, host=host_ip, port=xml_port, headless=False,
         wfall_only=False, start_delay=start_delay):
         self.host_ip = host
@@ -39,8 +39,8 @@ class fl_instance:
     def version(self):
         return self.fl_client.version
 
-    # send content manually vs. using main.send; assume we are in RX mode when calling
-    async def send(self, tx_msg):
+    # send content manually vs. using main.send; assume we are in RX mode when calling (fldigi default state)
+    async def radio_send(self, tx_msg):
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
         self.fl_client.main.tx()
@@ -64,10 +64,10 @@ class fl_instance:
         self.fl_client.main.rx()
 
     # received content is in bytes
-    async def receive(self):
+    async def radio_receive(self):
         rx_msg = bytes()
         rx_fragment = bytes()
-        # read loop that breaks on newline
+        # read loop assumes data terminates with '\n'
         while (True):
             sleep(self.poll_delay)
             rx_fragment = self.fl_client.text.get_rx_data()
@@ -135,10 +135,12 @@ async def main():
 
     # running instance started with custom config
     if (args.nodaemon):
+        print("Attached to fldigi, listening")
         while (True):
-            print(await fl_main.receive())
+            print(await fl_main.radio_receive())
     # child of this script
     else:
+        print("Started fldigi, sending")
         await test_standard(fl_main)
         await test_base64(fl_main)
         fl_main.stop()
