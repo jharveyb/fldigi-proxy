@@ -102,6 +102,14 @@ class fl_instance:
         sleep(self.stop_delay)
         self.fl_app.kill()
 
+# Convert raw data in a bytes() object to base64 for radio TX
+def raw_to_base64(raw_bytes):
+    return codecs.encode(codecs.decode(raw_bytes.hex(), 'hex'), 'base64')
+
+# Convert base64-encoded RX radio data to raw bytes() object for port 
+def base64_to_raw(base64_bytes):
+    return codecs.decode(base64_bytes, 'base64')
+
 async def test_standard(fl_digi):
     test_strings = ["TEST TEST TEST", "\n",
         "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.", "\n",
