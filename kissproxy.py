@@ -4,6 +4,7 @@ from time import sleep
 import argparse
 import pyfldigi
 import codecs
+import trio
 
 # Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
 # over a TCP/IP socket
@@ -39,7 +40,7 @@ class fl_instance:
         return self.fl_client.version
 
     # send content manually vs. using main.send; assume we are in RX mode when calling
-    def send(self, tx_msg):
+    async def send(self, tx_msg):
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
         self.fl_client.main.tx()
@@ -58,12 +59,12 @@ class fl_instance:
                     break
                 else:
                     tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
-        print("Sent:", tx_confirm_msg)
+        print("Sent!")
         self.fl_client.main.abort()
         self.fl_client.main.rx()
 
     # received content is in bytes
-    def receive(self):
+    async def receive(self):
         rx_msg = bytes()
         rx_fragment = bytes()
         # read loop that breaks on newline
@@ -101,22 +102,21 @@ class fl_instance:
         sleep(self.stop_delay)
         self.fl_app.kill()
 
-def test_standard(fl_digi):
+async def test_standard(fl_digi):
     test_strings = ["TEST TEST TEST", "\n",
         "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.", "\n",
         "The computer can be used as a tool to liberate and protect people, rather than to control them.", "\n"]
     for teststr in test_strings:
-        fl_digi.send(teststr)
+        await fl_digi.send(teststr)
 
-def test_base64(fl_digi):
+async def test_base64(fl_digi):
     test_all_bytes = bytes(range(255))
     kiss_sequence = 'C000DBDCDBDDC0'
     test_decode = codecs.encode(codecs.decode(kiss_sequence, 'hex'), 'base64')
     test_b64 = test_decode.decode()
-    fl_digi.send(test_b64)
+    await fl_digi.send(test_b64)
 
-
-def main():
+async def main():
     parser = argparse.ArgumentParser(description='Talk to fldigi.')
     parser.add_argument("--nodaemon", help="attach to an fldigi process", action="store_true")
     parser.add_argument('--xml', type=int, help="XML port")
@@ -136,12 +136,12 @@ def main():
     # running instance started with custom config
     if (args.nodaemon):
         while (True):
-            print(fl_main.receive())
+            print(await fl_main.receive())
     # child of this script
     else:
-        test_standard(fl_main)
-        test_base64(fl_main)
+        await test_standard(fl_main)
+        await test_base64(fl_main)
         fl_main.stop()
 
 if __name__ == "__main__":
-    main()
+    trio.run(main)
