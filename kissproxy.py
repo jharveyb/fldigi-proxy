@@ -14,18 +14,20 @@ import trio
 class fl_instance:
     host_ip = '127.0.0.1'
     xml_port = 7362
-    tcp_port = 7342
+    proxy_port = 22
     start_delay = 5
     stop_delay = 3
     poll_delay = 0.05
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
-    def __init__(self, nodaemon=False, host=host_ip, port=xml_port, headless=False,
-        wfall_only=False, start_delay=start_delay):
+    def __init__(self, nodaemon=False, noproxy=False, host=host_ip, xmlport=xml_port,
+        proxyport=proxy_port, headless=False, wfall_only=False, start_delay=start_delay):
         self.host_ip = host
-        if (port != None):
-            self.xml_port = port
+        if (xmlport != None):
+            self.xml_port = xmlport
+        if (noproxy == False):
+            self.proxy_port = proxyport
         self.start_delay = start_delay
         self.fl_client = pyfldigi.Client(hostname=self.host_ip, port=self.xml_port)
         self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
@@ -34,7 +36,7 @@ class fl_instance:
         sleep(self.start_delay)
 
     def port_info(self):
-        print("IP", self.host_ip, "XML-RPC port:", self.xml_port, "TCP port:", self.tcp_port)
+        print("IP", self.host_ip, "XML-RPC port:", self.xml_port, "proxy port:", self.proxy_port)
 
     def version(self):
         return self.fl_client.version
@@ -140,13 +142,21 @@ async def test_base64(fl_digi):
 
 async def main():
     parser = argparse.ArgumentParser(description='Talk to fldigi.')
-    parser.add_argument("--nodaemon", help="attach to an fldigi process", action="store_true")
+    parser.add_argument('--nodaemon', help="attach to an fldigi process", action="store_true")
     parser.add_argument('--xml', type=int, help="XML port")
     parser.add_argument('--nohead', help='run fldigi headless', action="store_true")
     parser.add_argument('--freq', type=float, help='set frequency in kHz')
+    parser.add_argument('--noproxy', help="run without TCP proxy", action="store_true")
+    parser.add_argument('--proxyport', type=int, help="TCP port of node to proxy; REQUIRED")
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead, args.freq)
-    fl_main = fl_instance(nodaemon=args.nodaemon, port=args.xml, headless=args.nohead)
+    print("args:", args.nodaemon, args.xml, args.nohead, args.freq, args.proxyport)
+    # No default port when running as TCP proxy
+    if (args.noproxy == False and args.proxyport == None):
+        print("Need a proxy port!")
+        return
+
+    fl_main = fl_instance(nodaemon=args.nodaemon, noproxy=args.noproxy, xmlport=args.xml,
+                            proxyport=args.proxyport, headless=args.nohead)
     print(fl_main.version())
     fl_main.port_info()
     sleep(fl_main.poll_delay)
