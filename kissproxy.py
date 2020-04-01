@@ -98,11 +98,11 @@ class fl_instance:
         while (True):
             print(await self.radio_receive())
 
-    def modem_info(self):
+    def rig_info(self):
         print("bandwidth", self.fl_client.rig.bandwidth, "frequency", self.fl_client.rig.frequency,
             "mode", self.fl_client.rig.mode, "name", self.fl_client.rig.name)
 
-    def modem_modify(self, bw='', freq=0.0, mode='', name=''):
+    def rig_modify(self, bw='', freq=0.0, mode='', name=''):
         if (bw != ''):
             self.fl_client.rig.bandwidth = bw
         if (freq != 0.0):
@@ -111,6 +111,19 @@ class fl_instance:
             self.fl_client.rig.mode = mode
         if (name != ''):
                 self.fl_client.rig.name = name
+
+    def modem_info(self):
+        print("bandwidth", self.fl_client.modem.bandwidth, "carrier", self.fl_client.modem.carrier,
+            "modem", self.fl_client.modem.name)
+
+    def modem_modify(self, bw=0, carrier=0, modem=''):
+        if (bw != 0):
+            self.fl_client.modem.bandwidth = bw
+        if (carrier != 0):
+            self.fl_client.modem.carrier = carrier
+        if (modem != '' and self.fl_client.modem.names.count(modem) == 1):
+            if (modem[0:4] == 'BPSK'):
+                self.fl_client.modem.name = modem
 
     def stop(self):
         self.fl_client.terminate(save_options=True)
@@ -170,8 +183,9 @@ async def main():
     parser.add_argument('--freq', type=float, help='set frequency in kHz')
     parser.add_argument('--noproxy', help="run without TCP proxy", action="store_true")
     parser.add_argument('--proxyport', type=int, help="TCP port of node to proxy; REQUIRED")
+    parser.add_argument('--modem', type=str, help="select a specific modem")
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead, args.freq, args.proxyport)
+    print("args:", args.nodaemon, args.xml, args.nohead, args.freq, args.proxyport, args.modem)
     # No default port when running as TCP proxy
     if (args.noproxy == False and args.proxyport == None):
         print("Need a proxy port!")
@@ -182,10 +196,16 @@ async def main():
     print(fl_main.version())
     fl_main.port_info()
     sleep(fl_main.poll_delay)
-    fl_main.modem_info()
+    fl_main.rig_info()
     sleep(fl_main.poll_delay)
     if (args.freq != None):
-        fl_main.modem_modify(freq=(args.freq*1e6))
+        fl_main.rig_modify(freq=(args.freq*1e6))
+        print("rig frequency now", args.freq, "kHz")
+    fl_main.modem_info()
+    sleep(fl_main.poll_delay)
+    if (args.modem != None):
+        fl_main.modem_modify(modem=args.modem)
+        print("modem now", args.modem)
 
     # running instance started with custom config
     if (args.nodaemon):
