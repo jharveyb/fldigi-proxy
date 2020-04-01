@@ -45,7 +45,9 @@ class fl_instance:
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
 
-    # send content manually vs. using main.send; assume we are in RX mode when calling (fldigi default state)
+    # send content manually vs. using main.send
+    # assume we are in RX mode when calling (fldigi default state)
+    # base64-encoded and newline-terminated
     async def radio_send(self, tx_msg):
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
@@ -60,12 +62,12 @@ class fl_instance:
             sleep(self.poll_delay)
             tx_confirm_fragment = self.fl_client.text.get_tx_data()
             if (tx_confirm_fragment != ''):
-                # sends terminate with \n; base64 guarantees this doesn't appear in our message
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
                     break
                 else:
                     tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
         print("Sent!")
+        sleep(self.poll_delay)
         self.fl_client.main.abort()
         self.fl_client.main.rx()
 
@@ -73,11 +75,10 @@ class fl_instance:
         for tx_msg in tx_msg_list:
             await self.radio_send(tx_msg)
 
-    # received content is in bytes
+    # received content is raw bytes, newline-terminated
     async def radio_receive(self):
         rx_msg = bytes()
         rx_fragment = bytes()
-        # read loop assumes data terminates with '\n'
         while (True):
             sleep(self.poll_delay)
             rx_fragment = self.fl_client.text.get_rx_data()
@@ -85,8 +86,6 @@ class fl_instance:
             if (rx_fragment != b''):
                 if (rx_fragment == b'\n'):
                     break
-                elif (rx_fragment == b'\r'):
-                    continue
                 # not sure why we have to double check this
                 elif (isinstance(rx_fragment, bytes)):
                     rx_msg += rx_fragment
