@@ -114,7 +114,11 @@ class fl_instance:
 
 # Convert raw data in a bytes() object to base64 for radio TX
 def raw_to_base64(raw_bytes):
-    return codecs.encode(codecs.decode(raw_bytes.hex(), 'hex'), 'base64')
+    base64_buffer = codecs.encode(codecs.decode(raw_bytes.hex(), 'hex'), 'base64')
+    # need to strip the newlines added every 76 bytes; intended for MIME
+    # https://docs.python.org/3/library/base64.html#base64.encodebytes
+    buffer_mod = len(base64_buffer) // 76
+    return base64_buffer.replace(b'\n', b'', buffer_mod)
 
 # Convert base64-encoded RX radio data to raw bytes() object for port 
 def base64_to_raw(base64_bytes):
@@ -138,6 +142,11 @@ def test_raw():
     for hs_message in handshakes:
         hs_base64 = raw_to_base64(hs_message)
         print(hs_base64)
+        # check for successful newline stripping
+        if (hs_base64.count(b'\n') != 1):
+            print("newline stripping failed!")
+            hs_test = False
+            break
         hs_raw = base64_to_raw(hs_base64)
         if (hs_raw != hs_message):
             print("encode/decode fail!")
