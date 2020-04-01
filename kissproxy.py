@@ -142,6 +142,49 @@ def raw_to_base64(raw_bytes):
 def base64_to_raw(base64_bytes):
     return codecs.decode(base64_bytes, 'base64')
 
+# use a timeout to detect the end of a message from a port
+# increment the timer proportional to data received
+# return data base64-encoded
+async def port_receive(recv_port: trio.SocketStream):
+    print("calling port_receive")
+    read_buffer = bytes()
+    # worst-case delay to read data from the socket / acts as poll rate for socket
+    base_timeout = 0.2
+    with trio.move_on_after(base_timeout) as end_recv_scope:
+        async for data in recv_port:
+            print("port_received", data)
+            read_buffer += data
+    # handle buffer; still passed up when empty for port_to_radio to catch and not send over radio
+    if end_recv_scope.cancelled_caught:
+        if (read_buffer != b''):
+            print("port_receive length", len(read_buffer))
+            return raw_to_base64(read_buffer)
+        else:
+            return read_buffer
+
+async def port_send(send_port: trio.SocketStream, port_msg: bytes):
+    print("calling port_send")
+    write_buffer = base64_to_raw(port_msg)
+    await send_port.send_all(write_buffer)
+
+# Top-level wrappers to handle port->radio and radio->port
+async def port_to_radio(fl_digi: fl_instance, proxy_port: trio.SocketStream):
+    print("starting port_to_radio")
+    # TODO: separate port_receive and radio_send so packets can queue up for the radio
+    while (True):
+        port_buffer = await port_receive(proxy_port)
+        # connection closed
+        if (port_buffer == None):
+            # throw an exception instead
+            break
+        if (port_buffer != b''):
+            await fl_digi.radio_send(port_buffer)
+
+async def radio_to_port(fl_digi: fl_instance, proxy_port: trio.SocketStream):
+    print("starting radio_to_port")
+    while (True):
+        await port_send(proxy_port, await fl_digi.radio_receive())
+
 def test_standard():
     test_strings = ["TEST TEST TEST\n",
         "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.\n",
@@ -225,6 +268,17 @@ async def main():
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(fl_main.radio_send_task, test_base64)
             fl_main.stop()
+
+    # TCP proxy mode
+    if (args.noproxy == False):
+        # TODO: pick role as either listener or server
+        # trio stream type needs to change + only one of port-to-radio or radio-to-port
+        proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
+
+        async with proxy_stream:
+            async with trio.open_nursery() as nursery:
+                nursery.start_soon(port_to_radio, fl_main, proxy_stream)
+                nursery.start_soon(radio_to_port, fl_main, proxy_stream)
 
 if __name__ == "__main__":
     trio.run(main)
