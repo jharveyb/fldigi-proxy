@@ -41,6 +41,10 @@ class fl_instance:
     def version(self):
         return self.fl_client.version
 
+    def clear_buffers(self):
+        self.fl_client.text.clear_rx()
+        self.fl_client.text.clear_tx()
+
     # send content manually vs. using main.send; assume we are in RX mode when calling (fldigi default state)
     async def radio_send(self, tx_msg):
         self.fl_client.text.clear_rx()
@@ -186,6 +190,7 @@ async def main():
     if (args.nodaemon):
         print("Attached to fldigi")
         if (args.noproxy == True):
+            fl_main.clear_buffers()
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(fl_main.radio_receive_task)
     # child of this script
