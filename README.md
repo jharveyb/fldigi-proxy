@@ -54,3 +54,9 @@ fldigi
 * Close pavucontrol
 * In Terminal 1, run `./kissproxy.py --nodaemon --xml=9998` to attach to the fldigi instance running in Terminal 0
 * Open a new terminal (Terminal 2) and run `./kissproxy.py` to start another fldigi instance
+
+### Planned changes
+
+* add support for basic modem control
+  * set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
+* add either ARQ support or FEC wrapping for more reliable transmission
