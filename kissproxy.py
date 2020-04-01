@@ -59,7 +59,7 @@ class fl_instance:
         tx_confirm_fragment = []
         print("Sending:", tx_msg)
         while (tx_msg != tx_confirm_msg):
-            sleep(self.poll_delay)
+            trio.sleep(self.poll_delay)
             tx_confirm_fragment = self.fl_client.text.get_tx_data()
             if (tx_confirm_fragment != ''):
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
@@ -67,7 +67,7 @@ class fl_instance:
                 else:
                     tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
         print("Sent!")
-        sleep(self.poll_delay)
+        await trio.sleep(self.poll_delay)
         self.fl_client.main.abort()
         self.fl_client.main.rx()
 
@@ -80,12 +80,14 @@ class fl_instance:
         rx_msg = bytes()
         rx_fragment = bytes()
         while (True):
-            sleep(self.poll_delay)
+            await trio.sleep(self.poll_delay)
             rx_fragment = self.fl_client.text.get_rx_data()
             #print(rx_fragment)
             if (rx_fragment != b''):
                 if (rx_fragment == b'\n'):
                     break
+                if (rx_fragment == b'\r'):
+                    continue
                 # not sure why we have to double check this
                 elif (isinstance(rx_fragment, bytes)):
                     rx_msg += rx_fragment
