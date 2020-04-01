@@ -59,7 +59,7 @@ class fl_instance:
         tx_confirm_fragment = []
         print("Sending:", tx_msg)
         while (tx_msg != tx_confirm_msg):
-            trio.sleep(self.poll_delay)
+            await trio.sleep(self.poll_delay)
             tx_confirm_fragment = self.fl_client.text.get_tx_data()
             if (tx_confirm_fragment != ''):
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
