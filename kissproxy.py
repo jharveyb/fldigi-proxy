@@ -87,7 +87,7 @@ class fl_instance:
                 if (rx_fragment == b'\n'):
                     break
                 if (rx_fragment == b'\r'):
-                    continue
+                    pass
                 # not sure why we have to double check this
                 elif (isinstance(rx_fragment, bytes)):
                     rx_msg += rx_fragment
