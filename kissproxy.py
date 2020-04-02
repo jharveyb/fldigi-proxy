@@ -18,6 +18,7 @@ class fl_instance:
     start_delay = 5
     stop_delay = 3
     poll_delay = 0.05
+    base64_prefix = b'BTC'
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
