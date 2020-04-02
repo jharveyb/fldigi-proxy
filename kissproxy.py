@@ -131,12 +131,14 @@ class fl_instance:
         self.fl_app.kill()
 
 # Convert raw data in a bytes() object to base64 for radio TX
-def raw_to_base64(raw_bytes):
+def raw_to_base64(raw_bytes, prefix=b'BTC'):
     base64_buffer = codecs.encode(codecs.decode(raw_bytes.hex(), 'hex'), 'base64')
     # need to strip the newlines added every 76 bytes; intended for MIME
     # https://docs.python.org/3/library/base64.html#base64.encodebytes
     buffer_mod = len(base64_buffer) // 76
-    return base64_buffer.replace(b'\n', b'', buffer_mod)
+    stripped_buffer = base64_buffer.replace(b'\n', b'', buffer_mod)
+    # add static prefix to assist with accurate decoding
+    return (prefix + stripped_buffer)
 
 # Convert base64-encoded RX radio data to raw bytes() object for port 
 def base64_to_raw(base64_bytes):
