@@ -1,6 +1,7 @@
 #!/usr/bin/python3.8
 
 from time import sleep
+from collections import deque
 import argparse
 import pyfldigi
 import codecs
@@ -72,9 +73,19 @@ class fl_instance:
         self.fl_client.main.abort()
         self.fl_client.main.rx()
 
-    async def radio_send_task(self, tx_msg_list):
+    async def radio_send_test_task(self, tx_msg_list):
         for tx_msg in tx_msg_list:
             await self.radio_send(tx_msg)
+
+    async def radio_send_task(self, packet_deque: deque): 
+        print("started radio_send_task")
+        radio_buffer = bytes()
+        while(True):
+            if (len(packet_deque) > 0):
+                radio_buffer = packet_deque.popleft()
+                await self.radio_send(radio_buffer)
+            else:
+                await trio.sleep(self.poll_delay)
 
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
@@ -156,22 +167,14 @@ def base64_to_raw(base64_bytes):
 # use a timeout to detect the end of a message from a port
 # increment the timer proportional to data received
 # return data base64-encoded
-async def port_receive(recv_port: trio.SocketStream):
+async def port_receive(recv_port: trio.SocketStream, packet_deque: deque):
     print("calling port_receive")
-    read_buffer = bytes()
-    # worst-case delay to read data from the socket / acts as poll rate for socket
-    base_timeout = 0.2
-    with trio.move_on_after(base_timeout) as end_recv_scope:
-        async for data in recv_port:
-            print("port_received", data)
-            read_buffer += data
-    # handle buffer; still passed up when empty for port_to_radio to catch and not send over radio
-    if end_recv_scope.cancelled_caught:
-        if (read_buffer != b''):
-            print("port_receive length", len(read_buffer))
-            return raw_to_base64(read_buffer)
-        else:
-            return read_buffer
+    async for data in recv_port:
+        print("port_received", data)
+        if (data != b''):
+            print("port_receive length", len(data))
+            packet_deque.append(raw_to_base64(data))
+            print(packet_deque)
 
 async def port_send(send_port: trio.SocketStream, port_msg: bytes):
     print("calling port_send")
@@ -181,15 +184,11 @@ async def port_send(send_port: trio.SocketStream, port_msg: bytes):
 # Top-level wrappers to handle port->radio and radio->port
 async def port_to_radio(fl_digi: fl_instance, proxy_port: trio.SocketStream):
     print("starting port_to_radio")
-    # TODO: separate port_receive and radio_send so packets can queue up for the radio
-    while (True):
-        port_buffer = await port_receive(proxy_port)
-        # connection closed
-        if (port_buffer == None):
-            # throw an exception instead
-            break
-        if (port_buffer != b''):
-            await fl_digi.radio_send(port_buffer)
+    packet_deque = deque()
+    async with proxy_port:
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(port_receive, proxy_port, packet_deque)
+            nursery.start_soon(fl_digi.radio_send_task, packet_deque)
 
 async def radio_to_port(fl_digi: fl_instance, proxy_port: trio.SocketStream):
     print("starting radio_to_port")
@@ -274,9 +273,9 @@ async def main():
             test_strings = test_standard()
             test_base64 = test_raw()
             async with trio.open_nursery() as nursery:
-                nursery.start_soon(fl_main.radio_send_task, test_strings)
+                nursery.start_soon(fl_main.radio_send_test_task, test_strings)
             async with trio.open_nursery() as nursery:
-                nursery.start_soon(fl_main.radio_send_task, test_base64)
+                nursery.start_soon(fl_main.radio_send_test_task, test_base64)
             fl_main.stop()
 
     # TCP proxy mode
