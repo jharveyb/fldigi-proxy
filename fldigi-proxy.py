@@ -63,6 +63,7 @@ class fl_instance:
         while (tx_msg != tx_confirm_msg):
             await trio.sleep(self.poll_delay)
             tx_confirm_fragment = self.fl_client.text.get_tx_data()
+            print(tx_confirm_fragment)
             if (tx_confirm_fragment != ''):
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
                     break
@@ -246,12 +247,12 @@ def test_raw():
 
 async def main():
     parser = argparse.ArgumentParser(description='Talk to fldigi.')
-    parser.add_argument('--nodaemon', help="attach to an fldigi process", action="store_true")
-    parser.add_argument('--xml', type=int, help="XML port")
-    parser.add_argument('--nohead', help='run fldigi headless', action="store_true")
-    parser.add_argument('--noproxy', help="run without TCP proxy", action="store_true")
-    parser.add_argument('--listener', help="run as proxy listener or server", action="store_true")
-    parser.add_argument('--proxyport', type=int, help="TCP port of node to proxy; REQUIRED")
+    parser.add_argument('--nodaemon', help="attach to an fldigi process instead of starting one", action="store_true")
+    parser.add_argument('--xml', type=int, help="XML-RPC port")
+    parser.add_argument('--nohead', help='run fldigi without a GUI', action="store_true")
+    parser.add_argument('--noproxy', help="run without TCP proxy functionality", action="store_true")
+    parser.add_argument('--listener', help="run as TCP proxy listener instead of server", action="store_true")
+    parser.add_argument('--proxyport', type=int, help="TCP port for proxy")
     parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
     args = parser.parse_args()
@@ -276,25 +277,6 @@ async def main():
     if (args.carrier != None):
         print("carrier frequency now", args.carrier, "Hz, AFC off")
 
-    # running instance started with custom config
-    if (args.nodaemon):
-        print("Attached to fldigi")
-        if (args.noproxy == True):
-            fl_main.clear_buffers()
-            async with trio.open_nursery() as nursery:
-                nursery.start_soon(fl_main.radio_receive_test_task)
-    # child of this script
-    else:
-        print("Started fldigi")
-        if (args.noproxy == True):
-            test_strings = test_standard()
-            test_base64 = test_raw()
-            async with trio.open_nursery() as nursery:
-                nursery.start_soon(fl_main.radio_send_test_task, test_strings)
-            async with trio.open_nursery() as nursery:
-                nursery.start_soon(fl_main.radio_send_test_task, test_base64)
-            fl_main.stop()
-
     # TCP proxy mode
     if (args.noproxy == False):
         proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
@@ -305,6 +287,26 @@ async def main():
                     nursery.start_soon(radio_to_port, fl_main, proxy_stream)
                 else:
                     nursery.start_soon(port_to_radio, fl_main, proxy_stream)
+    else:
+        # running instance started with custom config
+        if (args.nodaemon):
+            print("Attached to fldigi")
+            if (args.noproxy == True):
+                fl_main.clear_buffers()
+                async with trio.open_nursery() as nursery:
+                    nursery.start_soon(fl_main.radio_receive_test_task)
+        # child of this script
+        else:
+            print("Started fldigi")
+            if (args.noproxy == True):
+                test_strings = test_standard()
+                test_base64 = test_raw()
+                async with trio.open_nursery() as nursery:
+                    nursery.start_soon(fl_main.radio_send_test_task, test_strings)
+                async with trio.open_nursery() as nursery:
+                    nursery.start_soon(fl_main.radio_send_test_task, test_base64)
+                fl_main.stop()
+
 
 if __name__ == "__main__":
     trio.run(main)
