@@ -13,9 +13,18 @@ async def send_raw(proxy_port):
     test_handshake_3 = b'\x00-\x00\x10\x00\x02"\x00\x00\x03\x02\xaa\xa2\x01 \x06"nF\x11\x1a\x0bY\xca\xaf\x12`C\xeb[\xbf(\xc3O:^3*\x1f\xc7\xb2\xb7<\xf1\x88\x91\x0f'
     handshakes = [test_handshake_0, test_handshake_1, test_handshake_2, test_handshake_3]
     for data in handshakes:
+        print("sending data")
         await proxy_port.send_all(data)
-        # account for blocking sends on the radio
-        await trio.sleep(10.0)
+        # space out packets
+        await trio.sleep(0.1)
+
+async def tester_client(output_stream):
+    print("fldigi output client started")
+    try:
+        async for data in output_stream:
+            print(data)
+    except Exception as exc:
+        print("tester client crashed: {!r}".format(exc))
 
 async def tester_server(input_stream):
     print("fldigi input server started")
@@ -28,15 +37,24 @@ async def tester_server(input_stream):
     except Exception as exc:
         print("tester server crashed: {!r}".format(exc))
 
+async def server_wrapper(inport):
+    print("wrapping server")
+    await trio.serve_tcp(tester_server, inport) 
+
+async def client_wrapper(outport):
+    print("wrapping client")
+    await trio.serve_tcp(tester_client, outport) 
+
 async def main():
     parser = argparse.ArgumentParser(description="test fldigi-proxy")
     parser.add_argument("--inport", type=int, help="input port for fldigi-proxy")
-    #parser.add_argument("--outport", type=int, help="output port for fldigi-proxy")
+    parser.add_argument("--outport", type=int, help="output port for fldigi-proxy")
     args = parser.parse_args()
-
     print("TCP tester started")
-    await trio.serve_tcp(tester_server, args.inport) 
-    #proxy_output = await trio.open_tcp_stream("127.0.0.1", args.outport)
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(server_wrapper, args.inport)
+        nursery.start_soon(client_wrapper, args.outport)
 
 if __name__ == "__main__":
     trio.run(main)
