@@ -63,7 +63,6 @@ class fl_instance:
         while (tx_msg != tx_confirm_msg):
             await trio.sleep(self.poll_delay)
             tx_confirm_fragment = self.fl_client.text.get_tx_data()
-            print(tx_confirm_fragment)
             if (tx_confirm_fragment != ''):
                 if (tx_confirm_fragment.decode("utf-8") == '\n'):
                     break
@@ -123,6 +122,7 @@ class fl_instance:
         radio_buffer = bytes()
         while (True):
             radio_buffer = await self.radio_receive()
+            print("Received:", radio_buffer)
             packet_deque.append(radio_buffer)
 
     def rig_info(self):
@@ -180,9 +180,8 @@ async def port_receive(recv_port: trio.SocketStream, packet_deque: deque):
     async for data in recv_port:
         print("port_received", data)
         if (data != b''):
-            print("port_receive length", len(data))
             packet_deque.append(raw_to_base64(data))
-            print(packet_deque)
+            print("packet queue:", packet_deque)
 
 async def port_send(send_port: trio.SocketStream, packet_deque: deque):
     print("calling port_send")
@@ -191,6 +190,7 @@ async def port_send(send_port: trio.SocketStream, packet_deque: deque):
     while(True):
         if (len(packet_deque) > 0):
             packet_buffer = base64_to_raw(packet_deque.popleft())
+            print("port_sending", packet_buffer)
             await send_port.send_all(packet_buffer)
         else:
             await trio.sleep(poll_delay)

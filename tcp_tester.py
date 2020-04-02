@@ -14,7 +14,7 @@ handshakes = [test_handshake_0, test_handshake_1, test_handshake_2, test_handsha
 async def send_raw(proxy_port, packets):
     print("Beginning to serve raw packets")
     for data in packets:
-        print("sending data")
+        print("sending data:", data)
         await proxy_port.send_all(data)
         # space out packets
         await trio.sleep(0.1)
@@ -24,7 +24,7 @@ async def tester_client(output_stream):
     received_data = []
     try:
         async for data in output_stream:
-            print(data)
+            print("receiving data:", data)
             received_data.append(data)
             if (len(received_data) == len(handshakes)):
                 if (received_data == handshakes):
