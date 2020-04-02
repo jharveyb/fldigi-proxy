@@ -111,13 +111,13 @@ class fl_instance:
             "mode", self.fl_client.rig.mode, "name", self.fl_client.rig.name)
 
     def rig_modify(self, bw='', freq=0.0, mode='', name=''):
-        if (bw != ''):
+        if (bw != None and bw != ''):
             self.fl_client.rig.bandwidth = bw
-        if (freq != 0.0):
+        if (freq != None and freq != 0.0):
             self.fl_client.rig.frequency = freq
-        if (mode != ''):
+        if (mode != None and mode != ''):
             self.fl_client.rig.mode = mode
-        if (name != ''):
+        if (name != None and name != ''):
                 self.fl_client.rig.name = name
 
     def modem_info(self):
@@ -125,11 +125,12 @@ class fl_instance:
             "modem", self.fl_client.modem.name)
 
     def modem_modify(self, bw=0, carrier=0, modem=''):
-        if (bw != 0):
+        if (bw != None and bw != 0):
             self.fl_client.modem.bandwidth = bw
-        if (carrier != 0):
+        if (carrier != None and carrier != 0):
             self.fl_client.modem.carrier = carrier
-        if (modem != '' and self.fl_client.modem.names.count(modem) == 1):
+            self.fl_client.main.afc = False
+        if (modem != None and modem != '' and self.fl_client.modem.names.count(modem) == 1):
             if (modem[0:4] == 'BPSK'):
                 self.fl_client.modem.name = modem
 
@@ -233,12 +234,12 @@ async def main():
     parser.add_argument('--nodaemon', help="attach to an fldigi process", action="store_true")
     parser.add_argument('--xml', type=int, help="XML port")
     parser.add_argument('--nohead', help='run fldigi headless', action="store_true")
-    parser.add_argument('--freq', type=float, help='set frequency in kHz')
     parser.add_argument('--noproxy', help="run without TCP proxy", action="store_true")
     parser.add_argument('--proxyport', type=int, help="TCP port of node to proxy; REQUIRED")
+    parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead, args.freq, args.proxyport, args.modem)
+    print("args:", args.nodaemon, args.xml, args.nohead, args.proxyport, args.carrier, args.modem)
     # No default port when running as TCP proxy
     if (args.noproxy == False and args.proxyport == None):
         print("Need a proxy port!")
@@ -251,14 +252,13 @@ async def main():
     sleep(fl_main.poll_delay)
     fl_main.rig_info()
     sleep(fl_main.poll_delay)
-    if (args.freq != None):
-        fl_main.rig_modify(freq=(args.freq*1e6))
-        print("rig frequency now", args.freq, "kHz")
     fl_main.modem_info()
     sleep(fl_main.poll_delay)
+    fl_main.modem_modify(modem=args.modem, carrier=args.carrier)
     if (args.modem != None):
-        fl_main.modem_modify(modem=args.modem)
         print("modem now", args.modem)
+    if (args.carrier != None):
+        print("carrier frequency now", args.carrier, "Hz, AFC off")
 
     # running instance started with custom config
     if (args.nodaemon):
