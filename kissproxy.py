@@ -78,19 +78,26 @@ class fl_instance:
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
         rx_msg = bytes()
+        rx_prefix = bytes()
+        rx_prefix_check = False
         rx_fragment = bytes()
         while (True):
             await trio.sleep(self.poll_delay)
             rx_fragment = self.fl_client.text.get_rx_data()
-            #print(rx_fragment)
-            if (rx_fragment != b''):
-                if (rx_fragment == b'\n'):
-                    break
-                if (rx_fragment == b'\r'):
-                    pass
-                # not sure why we have to double check this
-                elif (isinstance(rx_fragment, bytes)):
-                    rx_msg += rx_fragment
+            # empty reads are strings, not bytes
+            if (isinstance(rx_fragment, bytes) and rx_fragment != b''):
+                if (rx_prefix_check == False):
+                    rx_prefix += rx_fragment
+                    if (rx_prefix.endswith(self.base64_prefix)):
+                        rx_prefix_check = True
+                # all data before prefix excluded from message, including noise from keying up radio
+                else: 
+                    if (rx_fragment == b'\n'):
+                        break
+                    elif (rx_fragment == b'\r'):
+                        pass
+                    else:
+                        rx_msg += rx_fragment
         self.fl_client.text.clear_rx()
         return rx_msg
 
@@ -203,7 +210,7 @@ def test_raw():
     handshakes_base64 = []
     hs_test = True
     for hs_message in handshakes:
-        hs_base64 = raw_to_base64(hs_message)
+        hs_base64 = raw_to_base64(hs_message, prefix=b'')
         print(hs_base64)
         # check for successful newline stripping
         if (hs_base64.count(b'\n') != 1):
