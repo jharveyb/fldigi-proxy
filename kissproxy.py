@@ -250,11 +250,12 @@ async def main():
     parser.add_argument('--xml', type=int, help="XML port")
     parser.add_argument('--nohead', help='run fldigi headless', action="store_true")
     parser.add_argument('--noproxy', help="run without TCP proxy", action="store_true")
+    parser.add_argument('--listener', help="run as proxy listener or server", action="store_true")
     parser.add_argument('--proxyport', type=int, help="TCP port of node to proxy; REQUIRED")
     parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead, args.proxyport, args.carrier, args.modem)
+    print("args:", args.nodaemon, args.xml, args.nohead, args.noproxy, args.listener, args.proxyport, args.carrier, args.modem)
     # No default port when running as TCP proxy
     if (args.noproxy == False and args.proxyport == None):
         print("Need a proxy port!")
@@ -281,7 +282,7 @@ async def main():
         if (args.noproxy == True):
             fl_main.clear_buffers()
             async with trio.open_nursery() as nursery:
-                nursery.start_soon(fl_main.radio_receive_task)
+                nursery.start_soon(fl_main.radio_receive_test_task)
     # child of this script
     else:
         print("Started fldigi")
@@ -296,14 +297,14 @@ async def main():
 
     # TCP proxy mode
     if (args.noproxy == False):
-        # TODO: pick role as either listener or server
-        # trio stream type needs to change + only one of port-to-radio or radio-to-port
         proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
 
         async with proxy_stream:
             async with trio.open_nursery() as nursery:
-                nursery.start_soon(port_to_radio, fl_main, proxy_stream)
-                nursery.start_soon(radio_to_port, fl_main, proxy_stream)
+                if (args.listener == True):
+                    nursery.start_soon(radio_to_port, fl_main, proxy_stream)
+                else:
+                    nursery.start_soon(port_to_radio, fl_main, proxy_stream)
 
 if __name__ == "__main__":
     trio.run(main)
