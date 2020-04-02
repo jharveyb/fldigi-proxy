@@ -113,9 +113,16 @@ class fl_instance:
         self.fl_client.text.clear_rx()
         return rx_msg
 
-    async def radio_receive_task(self):
+    async def radio_receive_test_task(self):
         while (True):
             print(await self.radio_receive())
+
+    async def radio_receive_task(self, packet_deque: deque):
+        print("started radio_receive_task")
+        radio_buffer = bytes()
+        while (True):
+            radio_buffer = await self.radio_receive()
+            packet_deque.append(radio_buffer)
 
     def rig_info(self):
         print("bandwidth", self.fl_client.rig.bandwidth, "frequency", self.fl_client.rig.frequency,
@@ -176,10 +183,16 @@ async def port_receive(recv_port: trio.SocketStream, packet_deque: deque):
             packet_deque.append(raw_to_base64(data))
             print(packet_deque)
 
-async def port_send(send_port: trio.SocketStream, port_msg: bytes):
+async def port_send(send_port: trio.SocketStream, packet_deque: deque):
     print("calling port_send")
-    write_buffer = base64_to_raw(port_msg)
-    await send_port.send_all(write_buffer)
+    packet_buffer = bytes()
+    poll_delay = 1.0
+    while(True):
+        if (len(packet_deque) > 0):
+            packet_buffer = base64_to_raw(packet_deque.popleft())
+            await send_port.send_all(packet_buffer)
+        else:
+            await trio.sleep(poll_delay)
 
 # Top-level wrappers to handle port->radio and radio->port
 async def port_to_radio(fl_digi: fl_instance, proxy_port: trio.SocketStream):
@@ -192,8 +205,11 @@ async def port_to_radio(fl_digi: fl_instance, proxy_port: trio.SocketStream):
 
 async def radio_to_port(fl_digi: fl_instance, proxy_port: trio.SocketStream):
     print("starting radio_to_port")
-    while (True):
-        await port_send(proxy_port, await fl_digi.radio_receive())
+    packet_deque = deque()
+    async with proxy_port:
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(fl_digi.radio_receive_task, packet_deque)
+            nursery.start_soon(port_send, proxy_port, packet_deque)
 
 def test_standard():
     test_strings = ["TEST TEST TEST\n",
