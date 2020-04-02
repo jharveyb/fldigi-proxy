@@ -57,6 +57,6 @@ fldigi
 
 ### Planned changes
 
-* add support for basic modem control
-  * set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
+* set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
+  * Calculate polling delays and other timeouts based on the modem baud rate
 * add either ARQ support or FEC wrapping for more reliable transmission
