@@ -32,9 +32,11 @@ class fl_instance:
             self.proxy_port = proxyport
         self.start_delay = start_delay
         self.fl_client = pyfldigi.Client(hostname=self.host_ip, port=self.xml_port)
-        self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
         if (nodaemon == False):
+            self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
             self.fl_app.start(headless=headless, wfall_only=wfall_only)
+        else:
+            self.fl_app = None
         sleep(self.start_delay)
 
     def port_info(self):
@@ -155,8 +157,9 @@ class fl_instance:
 
     def stop(self):
         self.fl_client.terminate(save_options=True)
-        sleep(self.stop_delay)
-        self.fl_app.kill()
+        if (self.fl_app != None):
+            sleep(self.stop_delay)
+            self.fl_app.kill()
 
 # Convert raw data in a bytes() object to base64 for radio TX
 def raw_to_base64(raw_bytes, prefix=b'BTC'):
