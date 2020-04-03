@@ -37,7 +37,6 @@ class fl_instance:
             self.fl_app.start(headless=headless, wfall_only=wfall_only)
         else:
             self.fl_app = None
-        sleep(self.start_delay)
 
     def port_info(self):
         print("IP", self.host_ip, "XML-RPC port:", self.xml_port, "proxy port:", self.proxy_port)
@@ -269,11 +268,8 @@ async def main():
                             proxyport=args.proxyport, headless=args.nohead)
     print(fl_main.version())
     fl_main.port_info()
-    sleep(fl_main.poll_delay)
     fl_main.rig_info()
-    sleep(fl_main.poll_delay)
     fl_main.modem_info()
-    sleep(fl_main.poll_delay)
     fl_main.modem_modify(modem=args.modem, carrier=args.carrier)
     if (args.modem != None):
         print("modem now", args.modem)
