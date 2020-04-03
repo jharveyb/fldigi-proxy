@@ -276,6 +276,7 @@ async def main():
     if (args.carrier != None):
         print("carrier frequency now", args.carrier, "Hz, AFC off")
 
+    fl_main.clear_buffers()
     # TCP proxy mode
     if (args.noproxy == False):
         proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
@@ -291,7 +292,6 @@ async def main():
         if (args.nodaemon):
             print("Attached to fldigi")
             if (args.noproxy == True):
-                fl_main.clear_buffers()
                 async with trio.open_nursery() as nursery:
                     nursery.start_soon(fl_main.radio_receive_test_task)
         # child of this script
