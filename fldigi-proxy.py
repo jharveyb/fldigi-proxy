@@ -169,7 +169,10 @@ async def port_receive(recv_port: trio.SocketStream, packet_deque: deque):
     print("calling port_receive")
     async for data in recv_port:
         print("port_received", data)
-        if (data != b''):
+        if (data == b''):
+            print("input port closed, stopping port_receive")
+            break
+        else:
             packet_deque.append(raw_to_base64(data))
             print("packet queue:", packet_deque)
 
@@ -181,7 +184,11 @@ async def port_send(send_port: trio.SocketStream, packet_deque: deque):
         if (len(packet_deque) > 0):
             packet_buffer = base64_to_raw(packet_deque.popleft())
             print("port_sending", packet_buffer)
-            await send_port.send_all(packet_buffer)
+            try:
+                await send_port.send_all(packet_buffer)
+            except Exception as exc:
+                print("port_send failed; output port probably closed")
+                print("{!r}".format(exc))
         else:
             await trio.sleep(poll_delay)
 
