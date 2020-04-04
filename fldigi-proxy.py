@@ -18,7 +18,9 @@ class fl_instance:
     proxy_port = 22
     send_poll = 0.1
     send_delay = 3.0
+    recv_poll = 1.0
     base64_prefix = b'BTC'
+    base64_suffix = b'\r\n'
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
@@ -84,24 +86,21 @@ class fl_instance:
         rx_prefix_check = False
         rx_fragment = bytes()
         while (True):
-            await trio.sleep(self.poll_delay)
+            await trio.sleep(self.recv_poll)
             rx_fragment = self.fl_client.text.get_rx_data()
-            # empty reads are strings, not bytes
             if (isinstance(rx_fragment, bytes) and rx_fragment != b''):
-                if (rx_prefix_check == False):
-                    rx_prefix += rx_fragment
-                    if (rx_prefix.endswith(self.base64_prefix)):
-                        rx_prefix_check = True
-                # all data before prefix excluded from message, including noise from keying up radio
-                else: 
-                    if (rx_fragment == b'\n'):
-                        break
-                    elif (rx_fragment == b'\r'):
-                        pass
-                    else:
-                        rx_msg += rx_fragment
+                rx_msg += rx_fragment
+                if rx_msg.endswith(self.base64_suffix):
+                    break
         self.fl_client.text.clear_rx()
-        return rx_msg
+        # check for correct prefix & suffix before sending
+        msg_start = rx_msg.find(self.base64_prefix)
+        msg_end = rx_msg.find(self.base64_suffix)
+        if (msg_start == -1 or msg_end == -1):
+            print("radio_receive invalid message!")
+            print(rx_msg)
+        else:
+            return rx_msg[msg_start+len(self.base64_prefix):msg_end]
 
     async def radio_receive_test_task(self):
         while (True):
@@ -150,7 +149,7 @@ class fl_instance:
             self.fl_app.kill()
 
 # Convert raw data in a bytes() object to base64 for radio TX
-def raw_to_base64(raw_bytes, prefix=b'BTC'):
+def raw_to_base64(raw_bytes, prefix=fl_instance.base64_prefix):
     base64_buffer = codecs.encode(codecs.decode(raw_bytes.hex(), 'hex'), 'base64')
     # need to strip the newlines added every 76 bytes; intended for MIME
     # https://docs.python.org/3/library/base64.html#base64.encodebytes
