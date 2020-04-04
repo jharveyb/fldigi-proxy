@@ -17,7 +17,7 @@ async def send_raw(proxy_port, packets):
         print("sending data:", data)
         await proxy_port.send_all(data)
         # space out packets
-        await trio.sleep(0.1)
+        await trio.sleep(15.0)
 
 async def tester_client(output_stream):
     print("fldigi output client started")
