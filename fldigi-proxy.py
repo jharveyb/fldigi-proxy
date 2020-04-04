@@ -16,9 +16,8 @@ class fl_instance:
     host_ip = '127.0.0.1'
     xml_port = 7362
     proxy_port = 22
-    start_delay = 5
-    stop_delay = 3
-    poll_delay = 0.05
+    send_poll = 0.1
+    send_delay = 3.0
     base64_prefix = b'BTC'
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
@@ -54,25 +53,16 @@ class fl_instance:
     async def radio_send(self, tx_msg):
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
-        self.fl_client.main.tx()
-        self.fl_client.text.add_tx(tx_msg)
-        # Poll and check TX'd data; reassemble & end send once msg made it out
-        byteflag = isinstance(tx_msg, bytes)
-        tx_confirm_msg = ''
-        tx_confirm_fragment = []
         print("Sending:", tx_msg)
-        while (tx_msg != tx_confirm_msg):
-            await trio.sleep(self.poll_delay)
-            tx_confirm_fragment = self.fl_client.text.get_tx_data()
-            if (tx_confirm_fragment != ''):
-                if (tx_confirm_fragment.decode("utf-8") == '\n'):
-                    break
-                else:
-                    tx_confirm_msg += tx_confirm_fragment.decode("utf-8")
+        # timeout should be large enough for worst-case TX time / packet size
+        # + buffer room for txmonitor to work
+        self.fl_client.main.send(tx_msg, block=True, timeout=60)
+        # txmonitor thread swtiches mode to RX soon after send finishes
+        while (self.fl_client.main.get_trx_state() != "RX"):
+            await trio.sleep(self.send_poll)
         print("Sent!")
-        await trio.sleep(self.poll_delay)
-        self.fl_client.main.abort()
-        self.fl_client.main.rx()
+        # wait for txmonitor thread to fully reset
+        await trio.sleep(self.send_delay)
 
     async def radio_send_test_task(self, tx_msg_list):
         for tx_msg in tx_msg_list:
@@ -86,7 +76,7 @@ class fl_instance:
                 radio_buffer = packet_deque.popleft()
                 await self.radio_send(radio_buffer)
             else:
-                await trio.sleep(self.poll_delay)
+                await trio.sleep(self.send_poll)
 
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
