@@ -23,13 +23,12 @@ class fl_instance:
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
     def __init__(self, nodaemon=False, noproxy=False, host=host_ip, xmlport=xml_port,
-        proxyport=proxy_port, headless=False, wfall_only=False, start_delay=start_delay):
+        proxyport=proxy_port, headless=False, wfall_only=False):
         self.host_ip = host
         if (xmlport != None):
             self.xml_port = xmlport
         if (noproxy == False):
             self.proxy_port = proxyport
-        self.start_delay = start_delay
         self.fl_client = pyfldigi.Client(hostname=self.host_ip, port=self.xml_port)
         if (nodaemon == False):
             self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
@@ -144,10 +143,10 @@ class fl_instance:
             if (modem[0:4] == 'BPSK'):
                 self.fl_client.modem.name = modem
 
-    def stop(self):
+    async def stop(self):
         self.fl_client.terminate(save_options=True)
         if (self.fl_app != None):
-            sleep(self.stop_delay)
+            trio.sleep(10.0)
             self.fl_app.kill()
 
 # Convert raw data in a bytes() object to base64 for radio TX
