@@ -1,14 +1,14 @@
 import logging
 import time
 from collections import deque
-from random import randint
+from random import random
 
 import pyfldigi
 import trio
 
 logger = logging.getLogger("fldigi")
 _client_logger = logging.getLogger("pyfldigi.client.text")
-# _client_logger.setLevel(logging.INFO)
+_client_logger.setLevel(logging.INFO)
 
 class fl_instance:
     # default ports: 7322 for ARQ, 7342 for TCP/IP, 7362 for XML, 8421 for fllog
@@ -41,6 +41,7 @@ class fl_instance:
             hostname=self.host_ip, port=self.xml_port
         )
         self.last_recv = time.time() - 25
+        self.last_send = time.time()
 
     def port_info(self):
         logger.info(
@@ -69,15 +70,18 @@ class fl_instance:
             # Got something to send
             else:
                 # First wait for a delay on last_recv time
-                # sleep for a random amount of time, to avoid sending at same time
-                time.sleep(randint(1, 10))
-                while self.last_recv + 25 > time.time():
+                # sleep to try and avoid sending at same time
+                time.sleep(random() * 5)
+                # Check it's our turn to send, if we just sent, we have priority
+                delay = 5 if self.last_send > self.last_recv else 10
+                while self.last_recv + delay > time.time():
                     await trio.sleep(self.poll_delay)
                 logger.info(f"Sending: {radio_buffer}")
                 _timeout = round(len(radio_buffer) * self._time_per_byte, 3)
                 # We actually use a long timeout because we might be receiving which
                 # blocks too
                 self.fl_client.main.send(radio_buffer, True, 300)
+                self.last_send = time.time()
                 logger.info(f"Sent: {radio_buffer}")
                 self.fl_client.main.abort()
                 self.fl_client.main.rx()
