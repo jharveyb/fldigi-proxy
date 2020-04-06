@@ -1,13 +1,14 @@
 import logging
 import time
 from collections import deque
+from random import randint
 
 import pyfldigi
 import trio
 
 logger = logging.getLogger("fldigi")
 _client_logger = logging.getLogger("pyfldigi.client.text")
-_client_logger.setLevel(logging.INFO)
+# _client_logger.setLevel(logging.INFO)
 
 class fl_instance:
     # default ports: 7322 for ARQ, 7342 for TCP/IP, 7362 for XML, 8421 for fllog
@@ -57,33 +58,6 @@ class fl_instance:
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
 
-    # send content manually vs. using main.send
-    # assume we are in RX mode when calling (fldigi default state)
-    # base64-encoded and newline-terminated
-    # async def radio_send(self, tx_msg):
-    #     # Clear send and recv text windows
-    #     self.clear_buffers()
-    #     # Query transmitted before starting to zero
-    #     self.fl_client.text.get_tx_data()
-    #     # Put into transmit mode
-    #     self.fl_client.main.tx()
-    #     # self.fl_client.text.transmit()
-    #
-    #     # Add the message to the Tx text widget
-    #     self.fl_client.text.add_tx(tx_msg)
-    #     logger.info(f"Sending: {tx_msg}")
-    #
-    #     # Magic number which should be enough transmit time for one message
-    #     # because self.fl_client.get_tx_data() always returns null (on MacOS at least?)
-    #     _sleep_dur = round(len(tx_msg) * self._time_per_byte, 3)
-    #     logger.debug(f"Sleeping for {_sleep_dur}s whilst sending")
-    #     await trio.sleep(_sleep_dur)
-    #
-    #     logger.info(f"Sent: {tx_msg}")
-    #     await trio.sleep(self.poll_delay)
-    #     self.fl_client.main.abort()
-    #     self.fl_client.main.rx()
-
     async def radio_send_task(self, packet_deque: deque):
         logger.debug("started radio_send_task")
         while True:
@@ -95,6 +69,8 @@ class fl_instance:
             # Got something to send
             else:
                 # First wait for a delay on last_recv time
+                # sleep for a random amount of time, to avoid sending at same time
+                time.sleep(randint(1, 10))
                 while self.last_recv + 25 > time.time():
                     await trio.sleep(self.poll_delay)
                 logger.info(f"Sending: {radio_buffer}")
