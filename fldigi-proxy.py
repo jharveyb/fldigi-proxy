@@ -31,7 +31,11 @@ class fl_instance:
             self.xml_port = xmlport
         if (noproxy == False):
             self.proxy_port = proxyport
-        self.fl_client = pyfldigi.Client(hostname=self.host_ip, port=self.xml_port)
+        try:
+            self.fl_client = pyfldigi.Client(hostname=self.host_ip, port=self.xml_port)
+        except:
+            print("pyfldigi client start failed! Check that ports aren't in use")
+            return
         if (nodaemon == False):
             self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
             self.fl_app.start(headless=headless, wfall_only=wfall_only)
@@ -273,7 +277,11 @@ async def main():
     fl_main.clear_buffers()
     # TCP proxy mode
     if (args.noproxy == False):
-        proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
+        try:
+            proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
+        except:
+            print("Opening port for proxy mode failed! Check port is not in use")
+            return
 
         async with proxy_stream:
             async with trio.open_nursery() as nursery:
