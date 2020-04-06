@@ -11,13 +11,35 @@ test_handshake_2 = b'\x00\xae);;\xcd\x02\xea\x12A\xfc@\xb6L\xd6\xd2.\x8by\xfc\xd
 test_handshake_3 = b'\x00-\x00\x10\x00\x02"\x00\x00\x03\x02\xaa\xa2\x01 \x06"nF\x11\x1a\x0bY\xca\xaf\x12`C\xeb[\xbf(\xc3O:^3*\x1f\xc7\xb2\xb7<\xf1\x88\x91\x0f'
 handshakes = [test_handshake_0, test_handshake_1, test_handshake_2, test_handshake_3]
 
-async def send_raw(proxy_port, packets):
-    print("Beginning to serve raw packets")
+async def recv_echo(proxy_port):
+    try:
+        async for data in proxy_port:
+            print("receiving echoed data:", data)
+            return data
+    except Exception as exc:
+        print("receive_echo crashed: {!r}".format(exc))
+
+async def send_raw_recv_echo(proxy_port, packets, echo=False):
+    echoed_data = []
+    print("Beginning to serve raw packets, echo =", echo)
     for data in packets:
         print("sending data:", data)
         await proxy_port.send_all(data)
         # space out packets
         await trio.sleep(15.0)
+        # receive echoes
+        if (echo == True):
+            print("Waiting for echoes")
+            echoed_packet = await recv_echo(proxy_port)
+            if (echoed_packet != data):
+                print("Echoed packet doesn't match sent packet!")
+            echoed_data.append(echoed_packet)
+            await trio.sleep(5.0)
+    await trio.sleep(1.0)
+    if (echo == True):
+        print("checking echoed data")
+        if (len(echoed_data) == len(packets) and echoed_data == packets):
+            print("Successful echo over proxy!")
 
 async def tester_client(output_stream):
     print("fldigi output client started")
@@ -26,9 +48,12 @@ async def tester_client(output_stream):
         async for data in output_stream:
             print("receiving data:", data)
             received_data.append(data)
-            if (len(received_data) == len(handshakes)):
-                if (received_data == handshakes):
-                    print("Successful proxying!")
+            print("echoing received data")
+            await trio.sleep(3.0)
+            await output_stream.send_all(data)
+        if (len(received_data) == len(handshakes) and received_data == handshakes):
+            print("Successful unidirectional proxying!")
+
     except Exception as exc:
         print("tester client crashed: {!r}".format(exc))
 
@@ -38,7 +63,7 @@ async def tester_server(input_stream):
     try:
         print("Sleeping for", delay, "seconds")
         await trio.sleep(delay)
-        await send_raw(input_stream, handshakes)
+        await send_raw_recv_echo(input_stream, handshakes, echo=True)
         print("tester finished")
     except Exception as exc:
         print("tester server crashed: {!r}".format(exc))
