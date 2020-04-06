@@ -126,7 +126,7 @@ class fl_instance:
         if (mode != None and mode != ''):
             self.fl_client.rig.mode = mode
         if (name != None and name != ''):
-                self.fl_client.rig.name = name
+            self.fl_client.rig.name = name
 
     def modem_info(self):
         print("bandwidth", self.fl_client.modem.bandwidth, "carrier", self.fl_client.modem.carrier,
@@ -248,12 +248,11 @@ async def main():
     parser.add_argument('--xml', type=int, help="XML-RPC port")
     parser.add_argument('--nohead', help='run fldigi without a GUI', action="store_true")
     parser.add_argument('--noproxy', help="run without TCP proxy functionality", action="store_true")
-    parser.add_argument('--listener', help="run as TCP proxy listener instead of server", action="store_true")
     parser.add_argument('--proxyport', type=int, help="TCP port for proxy")
     parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead, args.noproxy, args.listener, args.proxyport, args.carrier, args.modem)
+    print("args:", args.nodaemon, args.xml, args.nohead, args.noproxy, args.proxyport, args.carrier, args.modem)
     # No default port when running as TCP proxy
     if (args.noproxy == False and args.proxyport == None):
         print("Need a proxy port!")
@@ -278,10 +277,8 @@ async def main():
 
         async with proxy_stream:
             async with trio.open_nursery() as nursery:
-                if (args.listener == True):
-                    nursery.start_soon(radio_to_port, fl_main, proxy_stream)
-                else:
-                    nursery.start_soon(port_to_radio, fl_main, proxy_stream)
+                nursery.start_soon(radio_to_port, fl_main, proxy_stream)
+                nursery.start_soon(port_to_radio, fl_main, proxy_stream)
     else:
         # running instance started with custom config
         if (args.nodaemon):
