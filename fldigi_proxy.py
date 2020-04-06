@@ -1,14 +1,16 @@
 #!/usr/bin/python3.8
 
+"""
+Proxy TCP/IP connections over a radio via fldigi, and change
+basic settings in fldigi to better send packets vs. text
+"""
+
 from time import sleep
 from collections import deque
 import argparse
 import pyfldigi
 import codecs
 import trio
-
-# Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
-# over a TCP/IP socket
 
 # default ports: 7322 for ARQ, 7342 for TCP/IP, 7362 for XML, 8421 for fllog
 
@@ -23,9 +25,8 @@ class fl_instance:
     base64_suffix = b'\r\n'
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
-    # TODO: check ports before starting
     def __init__(self, nodaemon=False, noproxy=False, host=host_ip, xmlport=xml_port,
-        proxyport=proxy_port, headless=False, wfall_only=False):
+                 proxyport=proxy_port, headless=False, wfall_only=False):
         self.host_ip = host
         if (xmlport != None):
             self.xml_port = xmlport
@@ -73,7 +74,7 @@ class fl_instance:
         for tx_msg in tx_msg_list:
             await self.radio_send(tx_msg)
 
-    async def radio_send_task(self, packet_deque: deque): 
+    async def radio_send_task(self, packet_deque: deque):
         print("started radio_send_task")
         radio_buffer = bytes()
         while(True):
@@ -120,7 +121,7 @@ class fl_instance:
 
     def rig_info(self):
         print("bandwidth", self.fl_client.rig.bandwidth, "frequency", self.fl_client.rig.frequency,
-            "mode", self.fl_client.rig.mode, "name", self.fl_client.rig.name)
+              "mode", self.fl_client.rig.mode, "name", self.fl_client.rig.name)
 
     def rig_modify(self, bw='', freq=0.0, mode='', name=''):
         if (bw != None and bw != ''):
@@ -134,7 +135,7 @@ class fl_instance:
 
     def modem_info(self):
         print("bandwidth", self.fl_client.modem.bandwidth, "carrier", self.fl_client.modem.carrier,
-            "modem", self.fl_client.modem.name)
+              "modem", self.fl_client.modem.name)
 
     def modem_modify(self, bw=0, carrier=0, modem=''):
         if (bw != None and bw != 0):
@@ -162,7 +163,7 @@ def raw_to_base64(raw_bytes, prefix=fl_instance.base64_prefix):
     # add static prefix to assist with accurate decoding
     return (prefix + stripped_buffer)
 
-# Convert base64-encoded RX radio data to raw bytes() object for port 
+# Convert base64-encoded RX radio data to raw bytes() object for port
 def base64_to_raw(base64_bytes):
     return codecs.decode(base64_bytes, 'base64')
 
@@ -215,8 +216,8 @@ async def radio_to_port(fl_digi: fl_instance, proxy_port: trio.SocketStream):
 
 def test_standard():
     test_strings = ["TEST TEST TEST\n",
-        "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.\n",
-        "The computer can be used as a tool to liberate and protect people, rather than to control them.\n"]
+                    "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.\n",
+                    "The computer can be used as a tool to liberate and protect people, rather than to control them.\n"]
     return test_strings
 
 def test_raw():
@@ -263,7 +264,7 @@ async def main():
         return
 
     fl_main = fl_instance(nodaemon=args.nodaemon, noproxy=args.noproxy, xmlport=args.xml,
-                            proxyport=args.proxyport, headless=args.nohead)
+                          proxyport=args.proxyport, headless=args.nohead)
     print(fl_main.version())
     fl_main.port_info()
     fl_main.rig_info()

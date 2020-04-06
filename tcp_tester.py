@@ -1,6 +1,9 @@
 #!/usr/bin/python3.8
 
-# Test the fldigi-proxy TCP interface
+"""
+Test proxying between two fldigi & fldigi-proxy instances
+by passing binary data bidirectionally
+"""
 
 import argparse
 import trio
@@ -70,11 +73,11 @@ async def tester_server(input_stream):
 
 async def server_wrapper(inport):
     print("wrapping server")
-    await trio.serve_tcp(tester_server, inport) 
+    await trio.serve_tcp(tester_server, inport)
 
 async def client_wrapper(outport):
     print("wrapping client")
-    await trio.serve_tcp(tester_client, outport) 
+    await trio.serve_tcp(tester_client, outport)
 
 async def main():
     parser = argparse.ArgumentParser(description="test fldigi-proxy")
