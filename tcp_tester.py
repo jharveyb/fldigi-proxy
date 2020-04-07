@@ -32,7 +32,7 @@ async def send_raw_recv_echo(proxy_port, packets, echo=False):
         print("sending data:", data)
         await proxy_port.send_all(data)
         # packet will queue in proxy
-        await trio.sleep(1.0)
+        await trio.sleep(1.5)
     # receive echoes
     if (echo == True):
         print("Waiting for echoes")
@@ -48,7 +48,7 @@ async def send_raw_recv_echo(proxy_port, packets, echo=False):
                 listen_echoes = False
             await trio.sleep(0.5)
         print("checking echoed data")
-        if (len(echoed_data) == len(packets)):
+        if (len(echoed_data) == len(packets) and (valid_echo == True)):
             print("Successful echo over proxy!")
 
 async def tester_client(output_stream):

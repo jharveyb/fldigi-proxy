@@ -18,8 +18,8 @@ class fl_instance:
     host_ip = '127.0.0.1'
     xml_port = 7362
     proxy_port = 22
-    send_poll = 0.1
-    send_delay = 2.0
+    send_poll = 0.25
+    send_delay = 3.0
     recv_poll = 1.0
     base64_prefix = b'BTC'
     base64_suffix = b'\r\n'
@@ -62,7 +62,7 @@ class fl_instance:
         print("Sending:", tx_msg)
         # timeout should be large enough for worst-case TX time / packet size
         # + buffer room for txmonitor to work; currently tuned to BPSK63 as modem
-        self.fl_client.main.send(tx_msg, block=False, timeout=60)
+        self.fl_client.main.send(tx_msg, block=False, timeout=30)
         # txmonitor thread swtiches mode to RX soon after send finishes
         while (self.fl_client.main.get_trx_state() != "RX"):
             await trio.sleep(self.send_poll)
@@ -78,11 +78,10 @@ class fl_instance:
         print("started radio_send_task")
         radio_buffer = bytes()
         while(True):
+            await trio.sleep(self.send_poll)
             if (len(packet_deque) > 0):
                 radio_buffer = packet_deque.popleft()
                 await self.radio_send(radio_buffer)
-            else:
-                await trio.sleep(self.send_poll)
 
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
