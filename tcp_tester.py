@@ -24,50 +24,66 @@ async def recv_echo(proxy_port):
 
 async def send_raw_recv_echo(proxy_port, packets, echo=False):
     echoed_data = []
+    packet_counter = 0
+    listen_echoes = True
+    valid_echo = True
     print("Beginning to serve raw packets, echo =", echo)
     for data in packets:
         print("sending data:", data)
         await proxy_port.send_all(data)
-        # space out packets
-        await trio.sleep(15.0)
-        # receive echoes
-        if (echo == True):
-            print("Waiting for echoes")
-            echoed_packet = await recv_echo(proxy_port)
-            if (echoed_packet != data):
-                print("Echoed packet doesn't match sent packet!")
-            echoed_data.append(echoed_packet)
-            await trio.sleep(5.0)
-    await trio.sleep(1.0)
+        # packet will queue in proxy
+        await trio.sleep(1.0)
+    # receive echoes
     if (echo == True):
+        print("Waiting for echoes")
+        while (listen_echoes == True):
+            echoed_packet = await recv_echo(proxy_port)
+            if (echoed_packet != packets[packet_counter]):
+                print("Echoed packet doesn't match sent packet!")
+                valid_echo = False
+            echoed_data.append(echoed_packet)
+            packet_counter += 1
+            if (packet_counter == len(packets)):
+                print("received correct number of echoed packets")
+                listen_echoes = False
+            await trio.sleep(0.5)
         print("checking echoed data")
-        if (len(echoed_data) == len(packets) and echoed_data == packets):
+        if (len(echoed_data) == len(packets)):
             print("Successful echo over proxy!")
 
 async def tester_client(output_stream):
     print("fldigi output client started")
     received_data = []
+    received_counter = 0
     try:
         async for data in output_stream:
             print("receiving data:", data)
             received_data.append(data)
-            print("echoing received data")
-            await trio.sleep(3.0)
-            await output_stream.send_all(data)
-        if (len(received_data) == len(handshakes) and received_data == handshakes):
-            print("Successful unidirectional proxying!")
-
+            received_counter += 1
+            if (received_counter == len(handshakes)):
+                break
     except Exception as exc:
         print("tester client crashed: {!r}".format(exc))
+    print("client finished receiving data")
+    # delay for radio to switch from RX to TX
+    await trio.sleep(3.0)
+    print("echoing received data")
+    for data in received_data:
+        print("echoing:", data)
+        await output_stream.send_all(data)
+        # wait for each packet to go out
+        await trio.sleep(15.0)
+    await trio.sleep(1.0)
+    print("client finished")
+    return
 
 async def tester_server(input_stream):
     print("fldigi input server started")
-    delay = 2
     try:
-        print("Sleeping for", delay, "seconds")
-        await trio.sleep(delay)
+        await trio.sleep(1.0)
         await send_raw_recv_echo(input_stream, handshakes, echo=True)
-        print("tester finished")
+        print("server finished")
+        return
     except Exception as exc:
         print("tester server crashed: {!r}".format(exc))
 
