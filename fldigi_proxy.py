@@ -21,6 +21,8 @@ class fl_instance:
     send_poll = 0.25
     send_delay = 3.0
     recv_poll = 1.0
+    send_timeout_multiplier = 0.0
+    modem_timeout_multipliers = {'BPSK63' : 1.0, 'PSK125R' : 0.5, 'PSK250R' : 0.25, 'PSK500R' : 0.125}
     base64_prefix = b'BTC'
     base64_suffix = b'\r\n'
 
@@ -59,10 +61,11 @@ class fl_instance:
     async def radio_send(self, tx_msg):
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
+        msg_timeout = len(tx_msg) * self.send_timeout_multiplier
         print("Sending:", tx_msg)
         # timeout should be large enough for worst-case TX time / packet size
         # + buffer room for txmonitor to work; currently tuned to BPSK63 as modem
-        self.fl_client.main.send(tx_msg, block=False, timeout=30)
+        self.fl_client.main.send(tx_msg, block=False, timeout=msg_timeout)
         # txmonitor thread swtiches mode to RX soon after send finishes
         while (self.fl_client.main.get_trx_state() != "RX"):
             await trio.sleep(self.send_poll)
@@ -268,14 +271,30 @@ async def main():
     fl_main.port_info()
     fl_main.rig_info()
     fl_main.modem_info()
-    fl_main.rig_modify(mode=args.rigmode)
     if (args.rigmode != None):
+        fl_main.rig_modify(mode=args.rigmode)
         print("transceiver mode now", args.rigmode)
-    fl_main.modem_modify(modem=args.modem, carrier=args.carrier)
+    else:
+        print("Defaulting to USB transceiver mode")
+        fl_main.rig_modify(mode='USB')
     if (args.modem != None):
+        fl_main.modem_modify(modem=args.modem)
         print("modem now", args.modem)
+    else:
+        print("Defaulting to PSK125R")
+        fl_main.modem_modify(modem='PSK125R')
+    if (fl_main.fl_client.modem.name in fl_main.modem_timeout_multipliers):
+        fl_main.send_timeout_multiplier = fl_main.modem_timeout_multipliers[fl_main.fl_client.modem.name]
+    else:
+        print("No stored multiplier for how many seconds per byte your modem will do")
+        print("Defaulting to multiplier for PSK125R")
+        fl_main.send_timeout_multiplier = fl_main.modem_timeout_multipliers['PSK125R']
     if (args.carrier != None):
+        fl_main.modem_modify(carrier=args.carrier)
         print("carrier frequency now", args.carrier, "Hz, AFC off")
+    else:
+        print("Defaulting to 1500 Hz carrier with AFC off")
+        fl_main.modem_modify(carrier=1500)
 
     fl_main.clear_buffers()
     # TCP proxy mode
