@@ -53,16 +53,16 @@ class fl_instance:
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
 
-    # send content manually vs. using main.send
     # assume we are in RX mode when calling (fldigi default state)
-    # base64-encoded and newline-terminated
+    # and reset to RX after send completes
+    # binary data is base64-encoded and newline-terminated
     async def radio_send(self, tx_msg):
         self.fl_client.text.clear_rx()
         self.fl_client.text.clear_tx()
         print("Sending:", tx_msg)
         # timeout should be large enough for worst-case TX time / packet size
         # + buffer room for txmonitor to work
-        self.fl_client.main.send(tx_msg, block=True, timeout=60)
+        self.fl_client.main.send(tx_msg, block=False, timeout=60)
         # txmonitor thread swtiches mode to RX soon after send finishes
         while (self.fl_client.main.get_trx_state() != "RX"):
             await trio.sleep(self.send_poll)
