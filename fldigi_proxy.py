@@ -8,7 +8,6 @@ import trio
 import util
 from _fldigi import fl_instance
 
-
 POLL_DELAY = 1.0
 
 # Setup logging
@@ -16,7 +15,7 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(name)-12s: %(levelname)-8s %(message)s"
 )
 logger = logging.getLogger("proxy")
-
+# Turn down this noisy logger
 urllib = logging.getLogger("urllib3.connectionpool")
 urllib.setLevel(logging.INFO)
 
@@ -41,7 +40,6 @@ async def port_receive(recv_port: trio.SocketStream, packet_deque: deque):
 
 async def port_send(send_port: trio.SocketStream, packet_deque: deque):
     logger.debug("calling port_send")
-    packet_buffer = bytes()
     while True:
         if len(packet_deque) > 0:
             packet_buffer = util.base64_to_raw(packet_deque.popleft())

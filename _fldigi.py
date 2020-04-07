@@ -1,7 +1,6 @@
 import logging
 import time
 from collections import deque
-from random import randint
 
 import pyfldigi
 import trio
@@ -26,7 +25,7 @@ class fl_instance:
         "PSK500R": 0.125,
     }
     base64_prefix = b"BTC"
-    base64_suffix = b"\t\n"
+    base64_suffix = b"\r\n"
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
@@ -77,16 +76,15 @@ class fl_instance:
             # Got something to send
             else:
                 # Some sleeps to try and avoid transmitting at same time
-                # If last receive a while ago, random wait before sending
-                if self.last_recv + 20 < time.time():
-                    delay = randint(1, 20)
-                    logger.debug(
-                        f"Last receive a while ago, waiting {delay}s as random offset."
-                    )
-                    await trio.sleep(randint(1, 20))
-                # If we last send, sleep longer to be polite
-                delay = 10 if self.last_send > self.last_recv else 5
-                logger.debug(f"Waiting {delay}s to permit response")
+                # If we last sent, sleep longer to be polite!
+                if self.last_send > self.last_recv:
+                    delay = 10
+                    logger.debug(f"Waiting {delay}s before send as we sent last")
+                else:
+                    delay = 5
+                    logger.debug(f"Waiting {delay}s before send as we received last")
+                await trio.sleep(delay)
+                # Make sure we didn't start receiving while we were sleeping
                 while self.last_recv + delay > time.time():
                     await trio.sleep(self.poll_delay)
 
@@ -121,14 +119,15 @@ class fl_instance:
         else:
             while True:
                 rx_msg += await self.get_fragment()
-                # This fragment marks the end of a message
-                if rx_msg.endswith(b"\r\n"):
-                    # We sleep to prevent hearing close tone as part of next recv
-                    await trio.sleep(2)
+                # We've hit or gone past the end of one message.
+                # TODO: Extra bytes currently discarded
+                if self.base64_suffix in rx_msg:
                     break
         self.fl_client.text.clear_rx()
-        # Hack to strip prefix and suffix
-        return rx_msg[len(self.base64_prefix) : -len(self.base64_suffix)]
+        # Cleanup the message
+        _start = rx_msg.index(self.base64_prefix)
+        _end = rx_msg.index(self.base64_suffix)
+        return rx_msg[len(self.base64_prefix) + _start : _end]
 
     async def radio_receive_task(self, packet_deque: deque):
         logger.debug("started radio_receive_task")

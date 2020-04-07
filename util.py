@@ -1,10 +1,9 @@
 import argparse
 import codecs
-import time
 
-
-# Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
-# over a TCP/IP socket
+"""Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
+over a TCP/IP socket
+"""
 
 
 # Convert raw data in a bytes() object to base64 for radio TX
