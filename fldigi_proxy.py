@@ -7,6 +7,7 @@ basic settings in fldigi to better send packets vs. text
 
 from time import sleep
 from collections import deque
+from functools import partial
 import argparse
 import pyfldigi
 import codecs
@@ -221,7 +222,7 @@ def base64_to_raw(base64_bytes):
 async def port_receive(recv_port: trio.SocketStream, packet_deque: deque):
     print("calling port_receive")
     async for data in recv_port:
-        print("port_received", data)
+        print("port_received", data, "size", len(data))
         if (data == b''):
             print("input port closed, stopping port_receive")
             break
@@ -236,7 +237,7 @@ async def port_send(send_port: trio.SocketStream, packet_deque: deque):
     while(True):
         if (len(packet_deque) > 0):
             packet_buffer = base64_to_raw(packet_deque.popleft())
-            print("port_sending", packet_buffer)
+            print("port_sending", packet_buffer, "size", len(packet_buffer))
             try:
                 await send_port.send_all(packet_buffer)
             except Exception as exc:
@@ -295,12 +296,18 @@ def test_raw():
     if (hs_test == True):
         return handshakes_base64
 
+async def connection_handler(fl_main: fl_instance, proxy_stream):
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(radio_to_port, fl_main, proxy_stream)
+        nursery.start_soon(port_to_radio, fl_main, proxy_stream)
+
 async def main():
     parser = argparse.ArgumentParser(description='Talk to fldigi.')
     parser.add_argument('--daemon', help="spawn a child fldigi process instead of attaching to one", action="store_true")
     parser.add_argument('--xml', type=int, help="XML-RPC port")
     parser.add_argument('--nohead', help='run fldigi without a GUI', action="store_true")
     parser.add_argument('--noproxy', help="run without TCP proxy functionality", action="store_true")
+    parser.add_argument('--proxy_out', help="Set proxy port to outbound instead of inbound")
     parser.add_argument('--proxyport', type=int, help="TCP port for proxy")
     parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
@@ -346,16 +353,22 @@ async def main():
     fl_main.clear_buffers()
     # TCP proxy mode
     if (args.noproxy == False):
-        try:
-            proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
-        except:
-            print("Opening port for proxy mode failed! Check port is not in use")
-            return
+        if (args.proxy_out == True):
+            handler_wrapper = partial(connection_handler, fl_main=fl_main)
+            try:
+                await trio.serve_tcp(handler_wrapper, args.proxyport, host="127.0.0.1")
+            except:
+                print("Opening port for outbound proxy mode failed! Check port is not in use")
+                return
+        else:
+            try:
+                proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
+            except:
+                print("Opening port for inbound proxy mode failed! Check port is not in use")
+                return
+            async with proxy_stream:
+                await connection_handler(fl_main, proxy_stream)
 
-        async with proxy_stream:
-            async with trio.open_nursery() as nursery:
-                nursery.start_soon(radio_to_port, fl_main, proxy_stream)
-                nursery.start_soon(port_to_radio, fl_main, proxy_stream)
     else:
         # running instance started with custom config
         if (args.daemon):
