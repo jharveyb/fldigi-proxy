@@ -18,6 +18,13 @@ class fl_instance:
     proxy_port = 22
     # Mirror poll delay from pyfldigi.Client.TxMonitor
     poll_delay = 0.25
+    send_timeout_multiplier = 0.0
+    modem_timeout_multipliers = {
+        "BPSK63": 1.0,
+        "PSK125R": 0.5,
+        "PSK250R": 0.25,
+        "PSK500R": 0.125,
+    }
     base64_prefix = b"BTC"
     base64_suffix = b"\t\n"
 
@@ -79,15 +86,16 @@ class fl_instance:
                     await trio.sleep(randint(1, 20))
                 # If we last send, sleep longer to be polite
                 delay = 10 if self.last_send > self.last_recv else 5
-                logger.debug(f"We sent last! Waiting {delay}s to permit response")
+                logger.debug(f"Waiting {delay}s to permit response")
                 while self.last_recv + delay > time.time():
                     await trio.sleep(self.poll_delay)
 
                 logger.info(f"Sending: {radio_buffer}")
                 # We actually use a long timeout because we might be receiving which
                 # blocks too
+                msg_timeout = len(radio_buffer) * self.send_timeout_multiplier
                 try:
-                    self.fl_client.main.send(radio_buffer, True, 300)
+                    self.fl_client.main.send(radio_buffer, True, msg_timeout)
                 except TimeoutError as e:
                     # Try to continue
                     logger.exception(e)
@@ -115,6 +123,8 @@ class fl_instance:
                 rx_msg += await self.get_fragment()
                 # This fragment marks the end of a message
                 if rx_msg.endswith(b"\r\n"):
+                    # We sleep to prevent hearing close tone as part of next recv
+                    await trio.sleep(2)
                     break
         self.fl_client.text.clear_rx()
         # Hack to strip prefix and suffix
@@ -167,6 +177,7 @@ class fl_instance:
         ):
             if modem[0:4] == "BPSK":
                 self.fl_client.modem.name = modem
+            self.fl_client.modem.name = modem
 
     def stop(self):
         self.fl_client.terminate(save_options=True)

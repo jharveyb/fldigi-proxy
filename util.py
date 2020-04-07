@@ -75,6 +75,7 @@ def parse_args():
     parser.add_argument("--proxy_out", type=int, help="TCP port for lnproxy to connect to when making outbound connections to node")
     parser.add_argument("--carrier", type=int, help="set carrier frequency in Hz; disables AFC")
     parser.add_argument("--modem", type=str, help="select a specific modem")
+    parser.add_argument('--rigmode', type=str, help="select a transceiver mode")
     # fmt: on
     args = parser.parse_args()
     print(
@@ -93,33 +94,31 @@ def parse_args():
 def print_fl_stats(fl_main, args):
     print(fl_main.version())
     fl_main.port_info()
-    time.sleep(fl_main.poll_delay)
     fl_main.rig_info()
-    time.sleep(fl_main.poll_delay)
     fl_main.modem_info()
-    time.sleep(fl_main.poll_delay)
-    fl_main.modem_modify(modem=args.modem, carrier=args.carrier)
+    if args.rigmode is not None:
+        fl_main.rig_modify(mode=args.rigmode)
+        print("transceiver mode now", args.rigmode)
+    else:
+        print("Defaulting to USB transceiver mode")
+        fl_main.rig_modify(mode="USB")
     if args.modem is not None:
+        fl_main.modem_modify(modem=args.modem)
         print("modem now", args.modem)
+    else:
+        print("Defaulting to PSK125R")
+        fl_main.modem_modify(modem="PSK125R")
+    if fl_main.fl_client.modem.name in fl_main.modem_timeout_multipliers:
+        fl_main.send_timeout_multiplier = fl_main.modem_timeout_multipliers[
+            fl_main.fl_client.modem.name
+        ]
+    else:
+        print("No stored multiplier for how many seconds per byte your modem will do")
+        print("Defaulting to multiplier for PSK125R")
+        fl_main.send_timeout_multiplier = fl_main.modem_timeout_multipliers["PSK125R"]
     if args.carrier is not None:
+        fl_main.modem_modify(carrier=args.carrier)
         print("carrier frequency now", args.carrier, "Hz, AFC off")
-
-
-    # else:
-    # # running instance started with custom config
-    # if args.nodaemon:
-    #     print("Attached to fldigi")
-    #     if args.noproxy:
-    #         fl_main.clear_buffers()
-    #         async with trio.open_nursery() as nursery:
-    #             nursery.start_soon(fl_main.radio_receive_test_task)
-    # # child of this script
-    # else:
-    #     print("Started fldigi")
-    #     if args.noproxy:
-    #         test_strings = util.test_standard()
-    #         test_base64 = util.test_raw()
-    #         async with trio.open_nursery() as nursery:
-    #             nursery.start_soon(fl_main.radio_send_test_task, test_strings)
-    #             nursery.start_soon(fl_main.radio_send_test_task, test_base64)
-    #         fl_main.stop()
+    else:
+        print("Defaulting to 1500 Hz carrier with AFC off")
+        fl_main.modem_modify(carrier=1500)
