@@ -19,13 +19,13 @@ class fl_instance:
     xml_port = 7362
     proxy_port = 22
     send_poll = 0.1
-    send_delay = 3.0
+    send_delay = 2.0
     recv_poll = 1.0
     base64_prefix = b'BTC'
     base64_suffix = b'\r\n'
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
-    def __init__(self, nodaemon=False, noproxy=False, host=host_ip, xmlport=xml_port,
+    def __init__(self, daemon=False, noproxy=False, host=host_ip, xmlport=xml_port,
                  proxyport=proxy_port, headless=False, wfall_only=False):
         self.host_ip = host
         if (xmlport != None):
@@ -37,7 +37,7 @@ class fl_instance:
         except:
             print("pyfldigi client start failed! Check that ports aren't in use")
             return
-        if (nodaemon == False):
+        if (daemon == True):
             self.fl_app = pyfldigi.ApplicationMonitor(hostname=self.host_ip, port=self.xml_port)
             self.fl_app.start(headless=headless, wfall_only=wfall_only)
         else:
@@ -61,7 +61,7 @@ class fl_instance:
         self.fl_client.text.clear_tx()
         print("Sending:", tx_msg)
         # timeout should be large enough for worst-case TX time / packet size
-        # + buffer room for txmonitor to work
+        # + buffer room for txmonitor to work; currently tuned to BPSK63 as modem
         self.fl_client.main.send(tx_msg, block=False, timeout=60)
         # txmonitor thread swtiches mode to RX soon after send finishes
         while (self.fl_client.main.get_trx_state() != "RX"):
@@ -144,8 +144,7 @@ class fl_instance:
             self.fl_client.modem.carrier = carrier
             self.fl_client.main.afc = False
         if (modem != None and modem != '' and self.fl_client.modem.names.count(modem) == 1):
-            if (modem[0:4] == 'BPSK'):
-                self.fl_client.modem.name = modem
+            self.fl_client.modem.name = modem
 
     async def stop(self):
         self.fl_client.terminate(save_options=True)
@@ -249,26 +248,30 @@ def test_raw():
 
 async def main():
     parser = argparse.ArgumentParser(description='Talk to fldigi.')
-    parser.add_argument('--nodaemon', help="attach to an fldigi process instead of starting one", action="store_true")
+    parser.add_argument('--daemon', help="spawn a child fldigi process instead of attaching to one", action="store_true")
     parser.add_argument('--xml', type=int, help="XML-RPC port")
     parser.add_argument('--nohead', help='run fldigi without a GUI', action="store_true")
     parser.add_argument('--noproxy', help="run without TCP proxy functionality", action="store_true")
     parser.add_argument('--proxyport', type=int, help="TCP port for proxy")
     parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
+    parser.add_argument('--rigmode', type=str, help="select a transceiver mode")
     args = parser.parse_args()
-    print("args:", args.nodaemon, args.xml, args.nohead, args.noproxy, args.proxyport, args.carrier, args.modem)
+    print("args:", args.daemon, args.xml, args.nohead, args.noproxy, args.proxyport, args.carrier, args.modem, args.rigmode)
     # No default port when running as TCP proxy
     if (args.noproxy == False and args.proxyport == None):
         print("Need a proxy port!")
         return
 
-    fl_main = fl_instance(nodaemon=args.nodaemon, noproxy=args.noproxy, xmlport=args.xml,
+    fl_main = fl_instance(daemon=args.daemon, noproxy=args.noproxy, xmlport=args.xml,
                           proxyport=args.proxyport, headless=args.nohead)
     print(fl_main.version())
     fl_main.port_info()
     fl_main.rig_info()
     fl_main.modem_info()
+    fl_main.rig_modify(mode=args.rigmode)
+    if (args.rigmode != None):
+        print("transceiver mode now", args.rigmode)
     fl_main.modem_modify(modem=args.modem, carrier=args.carrier)
     if (args.modem != None):
         print("modem now", args.modem)
@@ -290,7 +293,7 @@ async def main():
                 nursery.start_soon(port_to_radio, fl_main, proxy_stream)
     else:
         # running instance started with custom config
-        if (args.nodaemon):
+        if (args.daemon):
             print("Attached to fldigi")
             if (args.noproxy == True):
                 async with trio.open_nursery() as nursery:
