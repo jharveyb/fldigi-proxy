@@ -1,7 +1,7 @@
 import logging
 import time
 from collections import deque
-from random import random
+from random import randint
 
 import pyfldigi
 import trio
@@ -10,15 +10,16 @@ logger = logging.getLogger("fldigi")
 _client_logger = logging.getLogger("pyfldigi.client.text")
 _client_logger.setLevel(logging.INFO)
 
+
 class fl_instance:
     # default ports: 7322 for ARQ, 7342 for TCP/IP, 7362 for XML, 8421 for fllog
     host_ip = "127.0.0.1"
     xml_port = 7362
     proxy_port = 22
-    poll_delay = 0.5
+    # Mirror poll delay from pyfldigi.Client.TxMonitor
+    poll_delay = 0.25
     base64_prefix = b"BTC"
     base64_suffix = b"\t\n"
-    _time_per_byte = 0.25
 
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
@@ -40,7 +41,7 @@ class fl_instance:
         self.fl_app = pyfldigi.ApplicationMonitor(
             hostname=self.host_ip, port=self.xml_port
         )
-        self.last_recv = time.time() - 25
+        self.last_recv = time.time()
         self.last_send = time.time()
 
     def port_info(self):
@@ -49,7 +50,6 @@ class fl_instance:
             f"XML-RPC port: {self.xml_port}\n"
             f"proxy in: {self.proxy_in}\n"
             f"proxy out: {self.proxy_out}\n"
-
         )
 
     def version(self):
@@ -69,53 +69,65 @@ class fl_instance:
                 await trio.sleep(self.poll_delay)
             # Got something to send
             else:
-                # First wait for a delay on last_recv time
-                # sleep to try and avoid sending at same time
-                time.sleep(random() * 5)
-                # Check it's our turn to send, if we just sent, we have priority
-                delay = 5 if self.last_send > self.last_recv else 10
+                # Some sleeps to try and avoid transmitting at same time
+                # If last receive a while ago, random wait before sending
+                if self.last_recv + 20 < time.time():
+                    delay = randint(1, 20)
+                    logger.debug(
+                        f"Last receive a while ago, waiting {delay}s as random offset."
+                    )
+                    await trio.sleep(randint(1, 20))
+                # If we last send, sleep longer to be polite
+                delay = 10 if self.last_send > self.last_recv else 5
+                logger.debug(f"We sent last! Waiting {delay}s to permit response")
                 while self.last_recv + delay > time.time():
                     await trio.sleep(self.poll_delay)
+
                 logger.info(f"Sending: {radio_buffer}")
-                _timeout = round(len(radio_buffer) * self._time_per_byte, 3)
                 # We actually use a long timeout because we might be receiving which
                 # blocks too
-                self.fl_client.main.send(radio_buffer, True, 300)
-                self.last_send = time.time()
+                try:
+                    self.fl_client.main.send(radio_buffer, True, 300)
+                except TimeoutError as e:
+                    # Try to continue
+                    logger.exception(e)
                 logger.info(f"Sent: {radio_buffer}")
                 self.fl_client.main.abort()
                 self.fl_client.main.rx()
 
+    async def get_fragment(self):
+        await trio.sleep(self.poll_delay)
+        fragment = self.fl_client.text.get_rx_data().strip(b" ")
+        if fragment is not b"":
+            logger.info(f"Got fragment: {fragment}")
+            self.last_recv = time.time()
+        return fragment
+
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
         rx_msg = bytes()
-        while True:
-            await trio.sleep(self.poll_delay)
-            # If we are transmitting, skip
-            if self.fl_client.txmonitor.get_state() == "TX":
-                continue
-            # Strip any erroneous empty bytes
-            rx_fragment = self.fl_client.text.get_rx_data().strip(b" ")
-            # discard empty reads
-            if rx_fragment is b"":
-                continue
-            else:
-                logger.info(f"Got fragment: {rx_fragment}")
-                self.last_recv = time.time()
-                rx_msg += rx_fragment
+        rx_msg += await self.get_fragment()
+        # Didn't get anything
+        if rx_msg is b"":
+            return rx_msg
+        else:
+            while True:
+                rx_msg += await self.get_fragment()
                 # This fragment marks the end of a message
                 if rx_msg.endswith(b"\r\n"):
                     break
         self.fl_client.text.clear_rx()
         # Hack to strip prefix and suffix
-        return rx_msg[len(self.base64_prefix):-len(self.base64_suffix)]
+        return rx_msg[len(self.base64_prefix) : -len(self.base64_suffix)]
 
     async def radio_receive_task(self, packet_deque: deque):
         logger.debug("started radio_receive_task")
         while True:
+            await trio.sleep(self.poll_delay)
             radio_buffer = await self.radio_receive()
-            logger.info(f"Received: {radio_buffer}")
-            packet_deque.append(radio_buffer)
+            if radio_buffer:
+                logger.info(f"Received: {radio_buffer}")
+                packet_deque.append(radio_buffer)
 
     def rig_info(self):
         logger.info(

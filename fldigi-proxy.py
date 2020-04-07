@@ -8,12 +8,17 @@ import trio
 import util
 from _fldigi import fl_instance
 
+
 POLL_DELAY = 1.0
 
+# Setup logging
+logging.basicConfig(
+    level=logging.DEBUG, format="%(name)-12s: %(levelname)-8s %(message)s"
+)
 logger = logging.getLogger("proxy")
+
 urllib = logging.getLogger("urllib3.connectionpool")
 urllib.setLevel(logging.INFO)
-logging.basicConfig(level=logging.DEBUG)
 
 
 # use a timeout to detect the end of a message from a port
