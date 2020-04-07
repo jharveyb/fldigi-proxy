@@ -109,6 +109,101 @@ NOTE: check which ports are already in use before assigning any here; this test 
 * Terminal 2 shows packets being received over fldigi, converted back to binary, and sent back out
 * Terminal 1 shows the test server connecting to each end of the proxy, sending packets, and then receiving the packets
 
+## Using with lnproxy
+
+#### Lnproxy setup
+
+* Pull [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
+* Follow the setup instructions
+* Start a 2 node lnproxy setup using:
+
+```bash
+# Source the helper scripts and start bitcoind/lightning nodes
+source /path/to/lightning/contrib/startup_script_2.sh
+start_ln
+# Add the other node to each node's router
+l1-cli add-node $(l2-cli gid) $(l2-cli getinfo | jq .id)
+l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)
+```
+
+After you run `l2-cli add-node...` note the listening port connections from that node should connect in to.
+
+#### Fldigi setup
+
+* Next we will start fldigi and fldigi-proxy
+
+```bash
+# Make two fldigi config dirs
+cd /path/to/fldigi-proxy/
+mkdir node1 node2
+# Start two fldigi instances using those config dirs
+fldigi --config_dir node1
+# (in a second terminal window)
+fldigi --config_dir node2
+```
+
+* Now we can modify the settings for the two fldigi instances using the GUI.
+* Follow the wizard and setup, use the following setting in the wizard to use your loopback device as soundcard:
+
+![wizard_loopback](/assets/wizard_soundcard.png)
+
+* After selecting loopback device, hit finish to complete.
+* With fldigi main window open `Config > config dialogue > Misc > TCP Settings`
+* Now set this node (node1)'s settings like so. Note that ARQ is enabled
+
+![node1_tcp](/assets/node1_tcp.png)
+
+* Save and close the config dialogue and choose `File > Exit` from the menu to implement the changes.
+* Now repeat with the second node, this time using the following settings in `Config > config dialogue > Misc > TCP Settings`:
+
+![node2_tcp](/assets/node2_tcp.png)
+
+* Save and quit node 2.
+* Restart both fldigi instances again using the same commands as before:
+
+```bash
+fldigi --config_dir node1
+# (in a second terminal window)
+fldigi --config_dir node2
+```
+
+#### Fldigi-proxy setup
+
+* With 2x fldigi running, we can now connect fldigi-proxy to them. We need two more terminal windows for this:
+
+```bash
+cd /path/to/fldigi-proxy/repo
+
+# In first window, this will connect to node1 who will make the outbound connection.
+# --proxy_out is the port we listen on for this outbound connection from C-Lightning
+./fldigi_proxy.py --xml 7362 --modem 'PSK125R' --carrier 1500 --proxy_out 58134
+
+# In second window. This will connect the inbound connection to C-Lightning
+# YOU MUST change the --proxy_in port argument to match the value returned when you ran
+# l2-cli add-node... command from Lnproxy Setup section above!
+./fldigi_proxy.py --xml 7363 --modem 'PSK125R' --carrier 1500 --proxy_in 99999
+```
+
+#### Connecting together
+
+* With 2 x fldigi + fldigi-proxy running, and two lightning nodes running with Lnproxy plugin enabled, we are ready to connect them together over the radio (ok, loopback soundcard device)!
+* Back in the lnproxy window, where we previously sourced the lightning helper commands:
+
+```bash
+# NOTE: the tcp port here MUST match that used above in the "--proxy_out" parameter
+l1-cli proxy-connect $(l2-cli gid) 58134
+
+# Once the connection is complete
+l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
+bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
+
+# Now we have a channel, make a payment
+l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
+```
+
+* Complete
+
+
 ### Planned changes
 
 * set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
