@@ -23,10 +23,14 @@ class fl_instance:
     recv_poll = 1.0
     send_timeout_multiplier = 0.0
     modem_timeout_multipliers = {'BPSK63' : 1.0, 'PSK125R' : 0.5, 'PSK250R' : 0.25, 'PSK500R' : 0.125}
+    # synchronize between radio_send and radio_recv to avoid collisions; states are 'RX', 'TX', or 'IDLE'
+    radio_state = 'IDLE'
+    # using instead of a lock since trio locks seem to only support release by the owner
+    radio_state_semaphore = trio.Semaphore(1)
     base64_prefix = b'BTC'
     base64_suffix = b'\r\n'
 
-    # we assume no port collisions for KISS, ARQ, or XMLRPC ports
+    # we assume no port collisions for ARQ or XMLRPC ports
     def __init__(self, daemon=False, noproxy=False, host=host_ip, xmlport=xml_port,
                  proxyport=proxy_port, headless=False, wfall_only=False):
         self.host_ip = host
@@ -82,9 +86,24 @@ class fl_instance:
         radio_buffer = bytes()
         while(True):
             await trio.sleep(self.send_poll)
-            if (len(packet_deque) > 0):
+            # never start a send while receiving on radio
+            if (self.radio_state == 'RX'):
+                continue
+            elif (len(packet_deque) > 0 and self.radio_state == 'IDLE'):
+                print("radio idle, starting a send")
+                await self.radio_state_semaphore.acquire()
+                self.radio_state = 'TX'
+                self.radio_state_semaphore.release()
+                print("radio state switched to TX, send imminent")
                 radio_buffer = packet_deque.popleft()
                 await self.radio_send(radio_buffer)
+                print("finished send, setting radio state back to IDLE")
+                await self.radio_state_semaphore.acquire()
+                self.radio_state = 'IDLE'
+                self.radio_state_semaphore.release()
+                print("radio idle, waiting", self.send_delay, "seconds in send loop")
+                # space out consecutive sends + allow for receives
+                await trio.sleep(self.send_delay)
 
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
@@ -94,12 +113,40 @@ class fl_instance:
         rx_fragment = bytes()
         while (True):
             await trio.sleep(self.recv_poll)
+            # ignore received data while radio is busy
+            if (self.radio_state == 'TX'):
+                print("radio state is TX, cannot receive")
+                continue
+            # state already RX from earlier in the receive process
+            elif (self.radio_state == 'RX'):
+                print("radio already in RX state")
+                pass
+            # switch radio state to allow for receive
+            elif (self.radio_state == 'IDLE'):
+                print("radio idle, starting an RX poll")
+                await self.radio_state_semaphore.acquire()
+                self.radio_state = 'RX'
+                self.radio_state_semaphore.release()
+                print("radio switched to RX")
+            # should only reach this if radio state is RX
             rx_fragment = self.fl_client.text.get_rx_data()
             if (isinstance(rx_fragment, bytes) and rx_fragment != b''):
                 rx_msg += rx_fragment
                 if rx_msg.endswith(self.base64_suffix):
                     break
+            # reset radio state at end of each poll
+            else:
+                print("no received data, switching radio back to IDLE")
+                await self.radio_state_semaphore.acquire()
+                self.radio_state = 'IDLE'
+                self.radio_state_semaphore.release()
         self.fl_client.text.clear_rx()
+        # RX complete, reset radio state
+        print("finishing receiving data, switching radio back to IDLE")
+        await self.radio_state_semaphore.acquire()
+        self.radio_state = 'IDLE'
+        self.radio_state_semaphore.release()
+        print("radio state IDLE, finishing parsing of received message")
         # check for correct prefix & suffix before sending
         msg_start = rx_msg.find(self.base64_prefix)
         msg_end = rx_msg.find(self.base64_suffix)
