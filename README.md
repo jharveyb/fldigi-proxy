@@ -22,76 +22,87 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 * Install Python 3.8
 * Install pavucontrol (to set sink & source for fldigi)
 * Install [fldigi](http://www.w1hkj.com/) (present in most distribution repos)
+  * NOTE: On OS X, you may need to add a symlink for pyfldigi to find your fldigi installation, ex.
+  * `sudo ln -s /Applications/fldigi-4.1.11.app/Contents/MacOS/fldigi /usr/local/bin`
+* Initialize and use a venv for Python dependencies
 * Use pip3 to install [pyfldigi](https://pythonhosted.org/pyfldigi/index.html) and [trio](https://trio.readthedocs.io/en/stable/)
-  * NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4 - some functions like main.send(), receive(), and transmit() have been removed
-* Make two directories which will be used to store fldigi config data
+  * NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4
+  * NOTE: If running on OS X, you'll need to remove the platform check in pyfldigi
+    * Specifically on line 31 of appmonitor.py
+* Make a directory which will be used to store fldigi config data
 
 ````bash
 git clone https://github.com/jharveyb/fldigi-proxy.git
 cd fldigi-proxy
 sudo apt-get install python3.8 pavucontrol fldigi
-pip3 install pyfldigi trio
-mkdir sender_config
+python3.8 -m venv venv
+source venv/bin/activate
+pip3.8 install --upgrade pip
+pip3.8 install -r requirements.txt
+mkdir config_fldigi
 ````
 
 ### Fldigi initialization
 
-* Start fldigi with sender_config as the config_dir, and set the ARQ and XML-RPC ports
+* Start fldigi with config_fldigi the config_dir to initialize the configuration
   * Even though we don't use the fldigi ARQ interface, we need the two fldigi instances to not collide on those ports
 
-`fldigi --config-dir sender_config --arq-server-port 22446 --xmlrpc-server-port 44668`
+`fldigi --config-dir config_fldigi`
 
 * Skip the first page of the initial setup
-* On the second page (Audio), select PulseAudio; leave the server field empty (or PortAudio if not on Linux)
-  * If using PortAudio, you should check the 'Audio loopback' section
-* Skip the last two pages; fldigi should start, buts needs to be restart to use the specified ports
+* On the second page (Audio), select PulseAudio (or PortAudio if not on Linux); leave the server field empty if using PulseAudio
+* Skip the remaining setup pages; fldigi should start, buts needs to be restarted to save the audio settings
 
 ### Audio loopback
+
+#### Linux
 
 * With fldigi running, open pavucontrol, and under the 'Recording' tab, set the fldigi process to capture from 'Monitor of $SINKNAME sink'
   * This means fldigi will listen on your default audio output instead of your microphone or other default source in PulseAudio.
   * PulseAudio settings are persistent, so all future fldigi instances should now use this 'audio loopback' setup.
-  * If you are using PortAudio, you'll need to set up a capture device that returns the same audio as your playback device.
 * Test the audio loopback by playing some music - you should see output in the waterfall panel at the bottom of the fldigi GUI
   * In pavucontrol, the bars in the Playback and Recording tabs should be in sync
 
+#### MacOS
+
+* You should be able to set up an audio loopback when fldigi is using PortAudio
+  * This [LOOPBACK](https://rogueamoeba.com/loopback/) program has been tested and successfully used
+* Test the audio loopback by playing some music - you should see output in the waterfall panel at the bottom of the fldigi GUI
+
 ### Running fldigi-proxy
 
-* fldigi-proxy will not run without any flags, and run in TCP proxy mode requires the proxy ports to be listening before start
-* The relevant flags for running in TCP proxy mode are nodaemon, xml, proxyport, and listener
-  * nodaemon requires that we attach to a running fldigi instance, listening on the xml port we pass
-    * fldigi-proxy starts its own fldigi instance by default; but we can't save settings to a specific directory in this case
-      * However, if the system fldigi ports are unchanged, this will work
-  * listener sets fldigi-proxy to pass data received on the radio to the TCP port passed with proxyport
-    * The default mode is being a server, i.e. send data from a port over the radio
-  * The nohead, carrier, and modem settings can be set regardless of which mode fldigi-proxy is run in
+* fldigi-proxy will not run without any flags, and running in TCP proxy mode requires the proxy ports to be listening before start
+* The relevant flags for running in TCP proxy mode are daemon, xml, proxyport, and proxy_out
+  * by default, fldigi-proxy will attach to an fldigi instance with an XML-RPC interface open
+    * fldigi-proxy can also start its own fldigi instance, but this uses the system config dir
+  * proxy_out sets the mode for the proxy port between expecting an inbound or outbound connection
+    * The default is to make an outbound connection; setting proxy_out means the proxy will expect to receive an outbound connection
+  * The nohead, rigmode, carrier, modem settings can be set independently of the other flags that change proxy or test behavior
 
-````python
-# Run as a server for TCP proxy, accepting data on port 8822
-./fldigi-proxy.py --proxyport 8822
-# Attach to a running fldigi instance via XML-RPC port 44668
-# and send data received via TCP proxy on port 8228
-./fldigi-proxy.py --nodaemon --listener --xml 44668 --proxyport 8228
-# Pass data received on port 8822 over the radio
-# and additionally lock the carrier frequency to 1500 Hz
-# (keeps sender & receiver from drifting given background noise)
-# Use the BPSK63 modem instead of BPSK31 for lower latency
-./fldigi-proxy.py --nodaemon --xml 22446 --proxyport 8822 --carrier 1500 --modem 'BPSK63'
+#### Examples
+
+````bash
+# Listen for an *inbound* connection on port 8822, attach to an fldigi instance listening on xml port 7362
+# Radio settings are unspecified so default to transceiver mode = USB, carrier = 1500 Hz, modem = PSK125R
+./fldigi_proxy.py --xml 7362 --proxy_out 8822
+
+# Make an *outbound* connection to remote TCP port 2288, change some fldigi radio-specific settings on startup
+./fldigi_proxy.py --xml 7362  --proxy_in 2288 --modem 'PSK125R' --rigmode 'CW' --carrier 1500
 ````
 
 ### TCP proxy test
 
-NOTE: check which ports are already in use before assigning any here; this test requires 6.
+NOTE: check which ports are already in use before assigning any here.
 
-* Open a new terminal (Terminal 0) and start fldigi, which will be used for the proxy sender
+* Open a new terminal (Terminal 0) and start first fldigi
 
-`fldigi --config-dir node1 --arq-server-port 7322 --xmlrpc-server-port 7362`
+`fldigi --config-dir config_fldigi`
 
-* Open a new terminal (Terminal 1) and start fldigi, which will be used for the proxy sender
+* Open a new terminal (Terminal 1) and start second fldigi
 
-`fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363`
+`fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363`
 
-* Open a new terminal (Terminal 1) and start the test server
+* Open a new terminal (Terminal 2) and start the TCP test server
   * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham)
 
 `./tcp_tester.py --auto`
@@ -107,7 +118,7 @@ NOTE: check which ports are already in use before assigning any here; this test 
 
 ### Lnproxy setup
 
-* Pull [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
+* Clone the [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
 * Follow the setup instructions
 * Start a 2 node lnproxy setup using:
 
@@ -126,16 +137,20 @@ After you run `l2-cli add-node...` note the listening port connections from that
 
 * Next we will start fldigi and fldigi-proxy
 
+*  Using the fldigi_config dir created earlier in (#Install-dependencies)
+
 ```bash
 cd /path/to/fldigi-proxy/
-# Using the fldigi config dir created earlier in #Install dependencies
 # Start two fldigi instances using based on that config
-fldigi --config-dir node1 --arq-server-port 7322 --xmlrpc-server-port 7362
+fldigi --config-dir fldigi_config
 # (in a second terminal window)
-fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363
+fldigi --config-dir fldigi_config --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
-* Now we can check the settings for the two fldigi instances using the GUI.
+#### Checking settings (optional) 
+
+* You can check the settings for the two fldigi instances using the GUI if you choose:
+
 * Check your soundcard is configured to use your loopback device, `Config > config dialogue > Soundcard > Devices`:
 
 ![soundcard_loopback](/assets/soundcard.png)
@@ -150,14 +165,15 @@ fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363
 
 ![node2_tcp](/assets/node2_tcp.png)
 
-* Save and quit second fldigi window.
-* Restart both fldigi instances again using the same commands as before:
+* Again, save and quit second fldigi window if you had to make any changes.
+ 
+* If you made changes, restart both fldigi instances again using the same commands as before:
 
 ```bash
 # Start two fldigi instances
-fldigi --config-dir node1 --arq-server-port 7322 --xmlrpc-server-port 7362
+fldigi --config-dir fldigi_config
 # (in a second terminal window)
-fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363
+fldigi --config-dir fldigi_config --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
 ### Fldigi-proxy setup
@@ -169,7 +185,7 @@ cd /path/to/fldigi_proxy/
 
 # In first window, this will connect to node1 who will make the outbound connection.
 # --proxy_out is the port we listen on for this outbound connection from C-Lightning
-./fldigi_proxy.py --xml 7362 --modem 'PSK125R' --carrier 1500 --proxy_out 58134
+./fldigi_proxy.py --xml 7362 --modem 'PSK125R' --carrier 1500 --proxy_out 55555
 
 # In second window. This will connect the inbound connection to C-Lightning
 # YOU MUST change the --proxy_in port argument to match the value returned when you ran
@@ -184,7 +200,7 @@ cd /path/to/fldigi_proxy/
 
 ```bash
 # NOTE: the tcp port here MUST match that used above in the "--proxy_out" parameter
-l1-cli proxy-connect $(l2-cli gid) 58134
+l1-cli proxy-connect $(l2-cli gid) 55555
 
 # Once the connection is complete
 l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
