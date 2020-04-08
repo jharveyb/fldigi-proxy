@@ -207,10 +207,9 @@ def raw_to_base64(raw_bytes, prefix=fl_instance.base64_prefix):
     base64_buffer = codecs.encode(codecs.decode(raw_bytes.hex(), 'hex'), 'base64')
     # need to strip the newlines added every 76 bytes; intended for MIME
     # https://docs.python.org/3/library/base64.html#base64.encodebytes
-    buffer_mod = len(base64_buffer) // 76
-    stripped_buffer = base64_buffer.replace(b'\n', b'', buffer_mod)
-    # add static prefix to assist with accurate decoding
-    return (prefix + stripped_buffer)
+    stripped_buffer = base64_buffer.replace(b'\n', b'')
+    # add static prefix to assist with accurate decoding + trailing newline
+    return (prefix + stripped_buffer + b'\n')
 
 # Convert base64-encoded RX radio data to raw bytes() object for port
 def base64_to_raw(base64_bytes):
