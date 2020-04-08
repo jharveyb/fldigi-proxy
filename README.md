@@ -71,26 +71,22 @@ mkdir fldigi_config
 
 ### Running fldigi-proxy
 
-* fldigi-proxy will not run without any flags, and run in TCP proxy mode requires the proxy ports to be listening before start
-* The relevant flags for running in TCP proxy mode are nodaemon, xml, proxyport, and listener
-  * nodaemon requires that we attach to a running fldigi instance, listening on the xml port we pass
-    * fldigi-proxy starts its own fldigi instance by default; but we can't save settings to a specific directory in this case
-      * However, if the system fldigi ports are unchanged, this will work
-  * listener sets fldigi-proxy to pass data received on the radio to the TCP port passed with proxyport
-    * The default mode is being a server, i.e. send data from a port over the radio
-  * The nohead, carrier, and modem settings can be set regardless of which mode fldigi-proxy is run in
+* fldigi-proxy will not run without any flags, and running in TCP proxy mode requires the proxy ports to be listening before start
+* The relevant flags for running in TCP proxy mode are daemon, xml, proxyport, and proxy_out
+  * by default, fldigi-proxy will attach to an fldigi instance with an XML-RPC interface open
+    * fldigi-proxy can also start its own fldigi instance, but this uses the system config dir
+  * proxy_out sets the mode for the proxy port between expecting an inbound or outbound connection
+    * The default is to make an outbound connection; setting proxy_out means the proxy will expect to receive an outbound connection
+  * The nohead, rigmode, carrier, modem settings can be set independently of the other flags that change proxy or test behavior
 
-````python
-# Run as a server for TCP proxy, accepting data on port 8822
-./fldigi-proxy.py --proxyport 8822
-# Attach to a running fldigi instance via XML-RPC port 44668
-# and send data received via TCP proxy on port 8228
-./fldigi-proxy.py --nodaemon --listener --xml 44668 --proxyport 8228
-# Pass data received on port 8822 over the radio
-# and additionally lock the carrier frequency to 1500 Hz
-# (keeps sender & receiver from drifting given background noise)
-# Use the BPSK63 modem instead of BPSK31 for lower latency
-./fldigi-proxy.py --nodaemon --xml 22446 --proxyport 8822 --carrier 1500 --modem 'BPSK63'
+#### Examples
+
+````bash
+# Make an outbound connection for TCP proxy, attatching to an fldigi instance listening on 44668, and accepting data on port 8822
+# Radio settings are unspecified so default to transceiver mode = USB, carrier = 1500 Hz, modem = PSK125R
+./fldigi-proxy.py --xml 44668 --proxyport 8822
+# Same proxy settings as above, but change fldigi radio-specific settings on startup
+./fldigi-proxy.py --xml 44668 --proxyport 8822 --rigmode 'CW' --carrier 2000 --modem 'PSK500R'
 ````
 
 ### TCP proxy test
