@@ -89,11 +89,15 @@ async def tester_server(input_stream):
 
 async def server_wrapper(inport):
     print("wrapping server")
-    await trio.serve_tcp(tester_server, inport)
+    proxy_input = await trio.open_tcp_stream('127.0.0.1', inport)
+    async with proxy_input:
+        await tester_server(proxy_input)
 
 async def client_wrapper(outport):
     print("wrapping client")
-    await trio.serve_tcp(tester_client, outport)
+    proxy_output = await trio.open_tcp_stream('127.0.0.1', outport)
+    async with proxy_output:
+        await tester_client(proxy_output)
 
 async def main():
     parser = argparse.ArgumentParser(description="test fldigi-proxy")

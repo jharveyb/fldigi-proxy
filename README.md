@@ -101,18 +101,18 @@ NOTE: check which ports are already in use before assigning any here; this test 
 
 `fldigi --config-dir config_fldigi --arq-server-port 33557 --xmlrpc-server-port 55779`
 
-* Open a new terminal (Terminal 2) and start the test server
+* Open a new terminal (Terminal 2) and attach a proxy to the first fldigi instance
+
+`./fldigi-proxy.py --xml 44668 --proxyport 2288 --proxy-out`
+
+* Open a new terminal (Terminal 3) and start the proxy that will send the initial packets
+
+`./fldigi-proxy.py --xml 55779 --proxyport 8822 --proxy-out`
+
+* Open a new terminal (Terminal 4) and start the test server
   * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham), and then echoes them back over the radio
 
 `./tcp_tester.py --inport 8822 --outport 2288`
-
-* Open a new terminal (Terminal 3) and attach a proxy to the first fldigi instance
-
-`./fldigi-proxy.py --xml 44668 --proxyport 2288`
-
-* Open a new terminal (Terminal 4) and start the proxy that will send the initial packets
-
-`./fldigi-proxy.py --xml 55779 --proxyport 8822`
 
 * After a short delay, packets should start flowing from the test server to the sending proxy
 * sent via fldigi to the listening proxy, and sent back to the test server, which checks that the packets match
@@ -120,9 +120,9 @@ NOTE: check which ports are already in use before assigning any here; this test 
 
 #### Debug messages
 
-* Terminal 4 shows packets being received, queued, and then converted to base64 and sent over fldigi
+* Terminal 2 shows packets being received, queued, and then converted to base64 and sent over fldigi
 * Terminal 3 shows packets being received over fldigi, converted back to binary, and sent back out
-* Terminal 2 shows the test server connecting to each end of the proxy, sending packets, and then receiving the packets
+* Terminal 4 shows the test server connecting to each end of the proxy, sending packets, and then receiving the packets
 
 ### Using with lnproxy
 
