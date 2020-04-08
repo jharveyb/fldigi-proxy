@@ -85,33 +85,27 @@ NOTE: check which ports are already in use before assigning any here; this test 
 
 * Open a new terminal (Terminal 0) and start fldigi, which will be used for the proxy sender
 
-`fldigi --config-dir sender_config --arq-server-port 22446 --xmlrpc-server-port 44668`
+`fldigi --config-dir node1 --arq-server-port 7322 --xmlrpc-server-port 7362`
+
+* Open a new terminal (Terminal 1) and start fldigi, which will be used for the proxy sender
+
+`fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363`
 
 * Open a new terminal (Terminal 1) and start the test server
   * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham)
 
-`./tcp_tester.py --inport 8822 --output 2288`
-
-* Open a new terminal (Terminal 2) and attach the listening proxy to the receiving fldigi instance
-
-`./fldigi-proxy.py --nodaemon --xml 44668 --proxyport 2288 --listener --modem 'BPSK63' --carrier 1500`
-
-* Open a new terminal (Terminal 3) and start the sending proxy
-
-`./fldigi-proxy.py --proxyport 8822 --modem 'BPSK63' --carrier 1500`
+`./tcp_tester.py --auto`
 
 * After a short delay, packets should start flowing from the test server to the sending proxy
+
 * sent via fldigi to the listening proxy, and sent back to the test server, which checks that the packets match
 
-#### Debug messages
+* Upon success, you will note `Successful echo over proxy!` and `server finished` in the logs.
 
-* Terminal 3 shows packets being received, queued, and then converted to base64 and sent over fldigi
-* Terminal 2 shows packets being received over fldigi, converted back to binary, and sent back out
-* Terminal 1 shows the test server connecting to each end of the proxy, sending packets, and then receiving the packets
 
 ## Using with lnproxy
 
-#### Lnproxy setup
+### Lnproxy setup
 
 * Pull [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
 * Follow the setup instructions
@@ -128,51 +122,50 @@ l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)
 
 After you run `l2-cli add-node...` note the listening port connections from that node should connect in to.
 
-#### Fldigi setup
+### Fldigi setup
 
 * Next we will start fldigi and fldigi-proxy
 
 ```bash
-# Make two fldigi config dirs
 cd /path/to/fldigi-proxy/
-mkdir node1 node2
-# Start two fldigi instances using those config dirs
-fldigi --config_dir node1
+# Using the fldigi config dir created earlier in #Install dependencies
+# Start two fldigi instances using based on that config
+fldigi --config-dir node1 --arq-server-port 7322 --xmlrpc-server-port 7362
 # (in a second terminal window)
-fldigi --config_dir node2
+fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
-* Now we can modify the settings for the two fldigi instances using the GUI.
-* Follow the wizard and setup, use the following setting in the wizard to use your loopback device as soundcard:
+* Now we can check the settings for the two fldigi instances using the GUI.
+* Check your soundcard is configured to use your loopback device, `Config > config dialogue > Soundcard > Devices`:
 
-![wizard_loopback](/assets/wizard_soundcard.png)
+![soundcard_loopback](/assets/soundcard.png)
 
-* After selecting loopback device, hit finish to complete.
-* With fldigi main window open `Config > config dialogue > Misc > TCP Settings`
+* next check ARQ and xml settings, `Config > config dialogue > Misc > TCP Settings`:
 * Now set this node (node1)'s settings like so. Note that ARQ is enabled
 
 ![node1_tcp](/assets/node1_tcp.png)
 
-* Save and close the config dialogue and choose `File > Exit` from the menu to implement the changes.
+* Save and close the config dialogue. If you had to make any corrections, you need to restart,  `File > Exit` from the menu, to implement the changes.
 * Now repeat with the second node, this time using the following settings in `Config > config dialogue > Misc > TCP Settings`:
 
 ![node2_tcp](/assets/node2_tcp.png)
 
-* Save and quit node 2.
+* Save and quit second fldigi window.
 * Restart both fldigi instances again using the same commands as before:
 
 ```bash
-fldigi --config_dir node1
+# Start two fldigi instances
+fldigi --config-dir node1 --arq-server-port 7322 --xmlrpc-server-port 7362
 # (in a second terminal window)
-fldigi --config_dir node2
+fldigi --config-dir node1 --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
-#### Fldigi-proxy setup
+### Fldigi-proxy setup
 
 * With 2x fldigi running, we can now connect fldigi-proxy to them. We need two more terminal windows for this:
 
 ```bash
-cd /path/to/fldigi-proxy/repo
+cd /path/to/fldigi_proxy/
 
 # In first window, this will connect to node1 who will make the outbound connection.
 # --proxy_out is the port we listen on for this outbound connection from C-Lightning
@@ -184,7 +177,7 @@ cd /path/to/fldigi-proxy/repo
 ./fldigi_proxy.py --xml 7363 --modem 'PSK125R' --carrier 1500 --proxy_in 99999
 ```
 
-#### Connecting together
+### Connecting together
 
 * With 2 x fldigi + fldigi-proxy running, and two lightning nodes running with Lnproxy plugin enabled, we are ready to connect them together over the radio (ok, loopback soundcard device)!
 * Back in the lnproxy window, where we previously sourced the lightning helper commands:
