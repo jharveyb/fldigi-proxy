@@ -22,9 +22,13 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 * Install Python 3.8
 * Install pavucontrol (to set sink & source for fldigi)
 * Install [fldigi](http://www.w1hkj.com/) (present in most distribution repos)
+  * NOTE: On OS X, you may need to add a symlink for pyfldigi to find your fldigi installation, ex.
+  * `sudo ln -s /Applications/fldigi-4.1.11.app/Contents/MacOS/fldigi /usr/local/bin`
 * Initialize and use a venv for Python dependencies
 * Use pip3 to install [pyfldigi](https://pythonhosted.org/pyfldigi/index.html) and [trio](https://trio.readthedocs.io/en/stable/)
   * NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4
+  * NOTE: If running on OS X, you'll need to remove the platform check in pyfldigi
+    * Specifically on line 31 of appmonitor.py
 * Make a directory which will be used to store fldigi config data
 
 ````bash
@@ -51,12 +55,19 @@ mkdir fldigi_config
 
 ### Audio loopback
 
+#### Linux
+
 * With fldigi running, open pavucontrol, and under the 'Recording' tab, set the fldigi process to capture from 'Monitor of $SINKNAME sink'
   * This means fldigi will listen on your default audio output instead of your microphone or other default source in PulseAudio.
   * PulseAudio settings are persistent, so all future fldigi instances should now use this 'audio loopback' setup.
-  * If you are using PortAudio, you'll need to set up a capture device that returns the same audio as your playback device.
 * Test the audio loopback by playing some music - you should see output in the waterfall panel at the bottom of the fldigi GUI
   * In pavucontrol, the bars in the Playback and Recording tabs should be in sync
+
+#### OS X
+
+* You should be able to set up an audio loopback when fldigi is using PortAudio
+  * This [LOOPBACK](https://rogueamoeba.com/loopback/) program has been tested and successfully used
+* Test the audio loopback by playing some music - you should see output in the waterfall panel at the bottom of the fldigi GUI
 
 ### Running fldigi-proxy
 
