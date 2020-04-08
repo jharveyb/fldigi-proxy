@@ -296,7 +296,7 @@ def test_raw():
     if (hs_test == True):
         return handshakes_base64
 
-async def connection_handler(fl_main: fl_instance, proxy_stream):
+async def connection_handler(proxy_stream, fl_main: fl_instance):
     async with trio.open_nursery() as nursery:
         nursery.start_soon(radio_to_port, fl_main, proxy_stream)
         nursery.start_soon(port_to_radio, fl_main, proxy_stream)
@@ -307,7 +307,7 @@ async def main():
     parser.add_argument('--xml', type=int, help="XML-RPC port")
     parser.add_argument('--nohead', help='run fldigi without a GUI', action="store_true")
     parser.add_argument('--noproxy', help="run without TCP proxy functionality", action="store_true")
-    parser.add_argument('--proxy_out', help="Set proxy port to outbound instead of inbound")
+    parser.add_argument('--proxy_out', help="Set proxy port to outbound instead of inbound", action="store_true")
     parser.add_argument('--proxyport', type=int, help="TCP port for proxy")
     parser.add_argument('--carrier', type=int, help='set carrier frequency in Hz; disables AFC')
     parser.add_argument('--modem', type=str, help="select a specific modem")
@@ -363,11 +363,11 @@ async def main():
         else:
             try:
                 proxy_stream = await trio.open_tcp_stream("127.0.0.1", args.proxyport)
+                async with proxy_stream:
+                    await connection_handler(fl_main, proxy_stream)
             except:
                 print("Opening port for inbound proxy mode failed! Check port is not in use")
                 return
-            async with proxy_stream:
-                await connection_handler(fl_main, proxy_stream)
 
     else:
         # running instance started with custom config
