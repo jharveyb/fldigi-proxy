@@ -93,20 +93,20 @@ class fl_instance:
             if (self.radio_state == 'RX'):
                 continue
             elif (len(packet_deque) > 0 and self.radio_state == 'IDLE'):
-                print("radio idle, starting a send")
+                print("radio idle, attempting to send")
                 # use base offset + random variance to help avoid simultaneous sends
                 await trio.sleep(self.send_poll*(min_send_wait_multiplier + randint(0, 4)))
                 await self.radio_state_semaphore.acquire()
                 self.radio_state = 'TX'
                 self.radio_state_semaphore.release()
-                print("radio state switched to TX, send imminent")
+                print("radio state switched to TX")
                 radio_buffer = packet_deque.popleft()
                 await self.radio_send(radio_buffer)
                 print("finished send, setting radio state back to IDLE")
                 await self.radio_state_semaphore.acquire()
                 self.radio_state = 'IDLE'
                 self.radio_state_semaphore.release()
-                print("radio idle, waiting", self.send_delay, "seconds in send loop")
+                print("radio idle, waiting in send loop")
                 # space out consecutive sends + allow for receives to interrupt
                 await trio.sleep(self.send_delay*2)
 
@@ -134,7 +134,6 @@ class fl_instance:
                 await self.radio_state_semaphore.acquire()
                 self.radio_state = 'RX'
                 self.radio_state_semaphore.release()
-                print("radio switched to RX")
             # should only reach this if radio state is RX
             rx_fragment = self.fl_client.text.get_rx_data()
             if (isinstance(rx_fragment, bytes) and rx_fragment != b''):
@@ -144,18 +143,18 @@ class fl_instance:
             # reset radio state at end of each poll
             else:
                 if (rx_msg != bytes() and rx_idle_counter < rx_idle_counter_limit):
-                    print("In middle of an RX, waiting to confirm end")
+                    print("Ongoing RX, waiting to confirm channel is idle")
                     rx_idle_counter += 1
                     continue
                 else:
-                    print("no received data, switching radio back to IDLE")
+                    print("no received data, switching radio state back to IDLE")
                     rx_idle_counter = 0
                     await self.radio_state_semaphore.acquire()
                     self.radio_state = 'IDLE'
                     self.radio_state_semaphore.release()
         self.fl_client.text.clear_rx()
         # RX complete; sleep to block a follow-up TX then reset radio state
-        print("finishing receiving data, switching radio back to IDLE")
+        print("finishing receiving data, switching radio state back to IDLE")
         await trio.sleep(self.recv_poll)
         await self.radio_state_semaphore.acquire()
         self.radio_state = 'IDLE'
