@@ -1,8 +1,13 @@
 #!/usr/bin/env python
 
-# Test the fldigi-proxy TCP interface
+"""
+Test proxying between two fldigi & fldigi-proxy instances
+by passing binary data bidirectionally
+"""
 
 import argparse
+import logging
+import subprocess
 
 import trio
 
@@ -13,37 +18,79 @@ test_handshake_3 = b'\x00-\x00\x10\x00\x02"\x00\x00\x03\x02\xaa\xa2\x01 \x06"nF\
 handshakes = [test_handshake_0, test_handshake_1, test_handshake_2, test_handshake_3]
 
 
-async def send_raw(proxy_port, packets):
-    print("Beginning to serve raw packets")
+async def recv_echo(proxy_port):
+    try:
+        async for data in proxy_port:
+            print("receiving echoed data:", data)
+            return data
+    except Exception as exc:
+        print("receive_echo crashed: {!r}".format(exc))
+
+
+async def send_raw_recv_echo(proxy_port, packets, echo=False):
+    echoed_data = []
+    packet_counter = 0
+    listen_echoes = True
+    valid_echo = True
+    print("Beginning to serve raw packets, echo =", echo)
     for data in packets:
         print("sending data:", data)
         await proxy_port.send_all(data)
-        # space out packets
-        await trio.sleep(50)
+        # packet will queue in proxy
+        await trio.sleep(1.5)
+    # receive echoes
+    if echo:
+        print("Waiting for echoes")
+        while listen_echoes:
+            echoed_packet = await recv_echo(proxy_port)
+            if echoed_packet != packets[packet_counter]:
+                print("Echoed packet doesn't match sent packet!")
+                valid_echo = False
+            echoed_data.append(echoed_packet)
+            packet_counter += 1
+            if packet_counter == len(packets):
+                print("received correct number of echoed packets")
+                listen_echoes = False
+            await trio.sleep(0.5)
+        print("checking echoed data")
+        if len(echoed_data) == len(packets) and (valid_echo == True):
+            print("Successful echo over proxy!")
 
 
 async def tester_client(output_stream):
     print("fldigi output client started")
     received_data = []
+    received_counter = 0
     try:
         async for data in output_stream:
             print("receiving data:", data)
             received_data.append(data)
-            if len(received_data) == len(handshakes):
-                if received_data == handshakes:
-                    print("Successful proxying!")
+            received_counter += 1
+            if received_counter == len(handshakes):
+                break
     except Exception as exc:
         print("tester client crashed: {!r}".format(exc))
+    print("client finished receiving data")
+    # delay for radio to switch from RX to TX
+    await trio.sleep(3.0)
+    print("echoing received data")
+    for data in received_data:
+        print("echoing:", data)
+        await output_stream.send_all(data)
+        # wait for each packet to go out
+        await trio.sleep(15.0)
+    await trio.sleep(1.0)
+    print("client finished")
+    return
 
 
 async def tester_server(input_stream):
     print("fldigi input server started")
-    delay = 5
     try:
-        print("Sleeping for", delay, "seconds")
-        await trio.sleep(delay)
-        await send_raw(input_stream, handshakes)
-        print("tester finished")
+        await trio.sleep(1.0)
+        await send_raw_recv_echo(input_stream, handshakes, echo=True)
+        print("server finished")
+        return
     except Exception as exc:
         print("tester server crashed: {!r}".format(exc))
 
@@ -55,19 +102,69 @@ async def server_wrapper(inport):
 
 async def client_wrapper(outport):
     print("wrapping client")
+    # await tester_client(await trio.open_tcp_stream("localhost", outport))
     await trio.serve_tcp(tester_client, outport)
 
 
 async def main():
+    # fmt: off
     parser = argparse.ArgumentParser(description="test fldigi-proxy")
-    parser.add_argument("--inport", type=int, help="input port for fldigi-proxy")
-    parser.add_argument("--outport", type=int, help="output port for fldigi-proxy")
+    parser.add_argument("--inport", type=int, default=8822, help="input port for fldigi-proxy")
+    parser.add_argument("--outport", type=int, default=2288, help="output port for fldigi-proxy")
+    parser.add_argument("--auto", default=False, help="Add debug output", action="store_true")
+    parser.add_argument("--debug", default=False, help="Add debug output", action="store_true")
+    # fmt: on
     args = parser.parse_args()
+    if not args.debug:
+        logging.getLogger("fldigi").setLevel(logging.INFO)
+        logging.getLogger("proxy").setLevel(logging.INFO)
+        logging.getLogger("pyfldigi.client.txmonitor").setLevel(logging.INFO)
+
+    if args.auto:
+        print(
+            "Ensure two instances of fldigi are running with :\n"
+            "1: --xmlrpc-server-port 7362\n"
+            "2: --xmlrpc-server-port 7363"
+        )
     print("TCP tester started")
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(server_wrapper, args.inport)
         nursery.start_soon(client_wrapper, args.outport)
+        if args.auto:
+            await trio.sleep(0.1)
+            nursery.start_soon(
+                trio.to_thread.run_sync,
+                subprocess.call,
+                [
+                    "python",
+                    "fldigi_proxy.py",
+                    "--xml",
+                    "7362",
+                    "--modem",
+                    "PSK125R",
+                    "--carrier",
+                    "1500",
+                    "--proxy_in",
+                    "8822",
+                ],
+            )
+            nursery.start_soon(
+                trio.to_thread.run_sync,
+                subprocess.call,
+                [
+                    "python",
+                    "fldigi_proxy.py",
+                    "--xml",
+                    "7363",
+                    "--modem",
+                    "PSK125R",
+                    "--carrier",
+                    "1500",
+                    "--proxy_in",
+                    "2288",
+                ],
+            )
 
 
 if __name__ == "__main__":
