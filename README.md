@@ -39,12 +39,12 @@ python3.8 -m venv venv
 source venv/bin/activate
 pip3.8 install --upgrade pip
 pip3.8 install -r requirements.txt
-mkdir fldigi_config
+mkdir config_fldigi
 ````
 
 ### Fldigi initialization
 
-* Start fldigi with fldigi_config the config_dir to initialize the configuration
+* Start fldigi with config_fldigi the config_dir to initialize the configuration
   * Even though we don't use the fldigi ARQ interface, we need the two fldigi instances to not collide on those ports
 
 `fldigi --config-dir config_fldigi`
