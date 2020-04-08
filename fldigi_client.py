@@ -125,8 +125,12 @@ class fl_instance:
                     break
         self.fl_client.text.clear_rx()
         # Cleanup the message
-        _start = rx_msg.index(self.base64_prefix)
-        _end = rx_msg.index(self.base64_suffix)
+        try:
+            _start = rx_msg.index(self.base64_prefix)
+            _end = rx_msg.index(self.base64_suffix)
+        except ValueError:
+            logger.exception("in radio_receive")
+            return None
         return rx_msg[len(self.base64_prefix) + _start : _end]
 
     async def radio_receive_task(self, packet_deque: deque):

@@ -6,7 +6,7 @@ from functools import partial
 import trio
 
 import util
-from _fldigi import fl_instance
+from fldigi_client import fl_instance
 
 POLL_DELAY = 1.0
 
