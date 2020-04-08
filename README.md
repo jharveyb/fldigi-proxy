@@ -40,15 +40,14 @@ mkdir fldigi_config
 
 ### Fldigi initialization
 
-* Start fldigi with sender_config as the config_dir, and set the ARQ and XML-RPC ports
+* Start fldigi with fldigi_config the config_dir to initialize the configuration
   * Even though we don't use the fldigi ARQ interface, we need the two fldigi instances to not collide on those ports
 
-`fldigi --config-dir sender_config --arq-server-port 22446 --xmlrpc-server-port 44668`
+`fldigi --config-dir config_fldigi`
 
 * Skip the first page of the initial setup
-* On the second page (Audio), select PulseAudio; leave the server field empty (or PortAudio if not on Linux)
-  * If using PortAudio, you should check the 'Audio loopback' section
-* Skip the last two pages; fldigi should start, buts needs to be restart to use the specified ports
+* On the second page (Audio), select PulseAudio (or PortAudio if not on Linux); leave the server field empty if using PulseAudio
+* Skip the remaining setup pages; fldigi should start, buts needs to be restarted to save the audio settings
 
 ### Audio loopback
 
