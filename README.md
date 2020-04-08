@@ -90,7 +90,7 @@ NOTE: check which ports are already in use before assigning any here; this test 
 * Open a new terminal (Terminal 1) and start the test server
   * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham)
 
-`./tcp_tester.py --inport 8822 --output 2288`
+`./tcp_tester.py --inport 8822 --outport 2288`
 
 * Open a new terminal (Terminal 2) and attach the listening proxy to the receiving fldigi instance
 
