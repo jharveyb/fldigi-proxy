@@ -111,7 +111,7 @@ async def main():
     parser = argparse.ArgumentParser(description="test fldigi-proxy")
     parser.add_argument("--inport", type=int, default=8822, help="input port for fldigi-proxy")
     parser.add_argument("--outport", type=int, default=2288, help="output port for fldigi-proxy")
-    parser.add_argument("--auto", default=False, help="Add debug output", action="store_true")
+    parser.add_argument("--auto", default=False, help="Run in auto mode, popping open 2 instances of fldigi_proxy automagically", action="store_true")
     parser.add_argument("--debug", default=False, help="Add debug output", action="store_true")
     # fmt: on
     args = parser.parse_args()
