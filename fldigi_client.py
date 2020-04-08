@@ -98,6 +98,7 @@ class fl_instance:
                     # Try to continue
                     logger.exception(e)
                 logger.info(f"Sent: {radio_buffer}")
+                self.last_send = time.time()
                 self.fl_client.main.abort()
                 self.fl_client.main.rx()
 
