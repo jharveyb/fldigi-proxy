@@ -8,6 +8,7 @@ basic settings in fldigi to better send packets vs. text
 from time import sleep
 from collections import deque
 from functools import partial
+from random import randint
 import argparse
 import pyfldigi
 import codecs
@@ -23,7 +24,7 @@ class fl_instance:
     send_delay = 3.0
     recv_poll = 1.0
     send_timeout_multiplier = 0.0
-    modem_timeout_multipliers = {'BPSK63' : 1.0, 'PSK125R' : 0.5, 'PSK250R' : 0.25, 'PSK500R' : 0.125}
+    modem_timeout_multipliers = {'BPSK63' : 1.0, 'PSK125R' : 0.6, 'PSK250R' : 0.6, 'PSK500R' : 0.15}
     # synchronize between radio_send and radio_recv to avoid collisions; states are 'RX', 'TX', or 'IDLE'
     radio_state = 'IDLE'
     # using instead of a lock since trio locks seem to only support release by the owner
@@ -85,6 +86,7 @@ class fl_instance:
     async def radio_send_task(self, packet_deque: deque):
         print("started radio_send_task")
         radio_buffer = bytes()
+        min_send_wait_multiplier = 4
         while(True):
             await trio.sleep(self.send_poll)
             # never start a send while receiving on radio
@@ -92,6 +94,8 @@ class fl_instance:
                 continue
             elif (len(packet_deque) > 0 and self.radio_state == 'IDLE'):
                 print("radio idle, starting a send")
+                # use base offset + random variance to help avoid simultaneous sends
+                await trio.sleep(self.send_poll*(min_send_wait_multiplier + randint(0, 4)))
                 await self.radio_state_semaphore.acquire()
                 self.radio_state = 'TX'
                 self.radio_state_semaphore.release()
@@ -103,8 +107,8 @@ class fl_instance:
                 self.radio_state = 'IDLE'
                 self.radio_state_semaphore.release()
                 print("radio idle, waiting", self.send_delay, "seconds in send loop")
-                # space out consecutive sends + allow for receives
-                await trio.sleep(self.send_delay)
+                # space out consecutive sends + allow for receives to interrupt
+                await trio.sleep(self.send_delay*2)
 
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
