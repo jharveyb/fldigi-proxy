@@ -22,7 +22,7 @@ class fl_instance:
     proxy_port = 22
     send_poll = 0.25
     send_delay = 3.0
-    recv_poll = 1.0
+    recv_poll = 0.6
     send_timeout_multiplier = 0.0
     modem_timeout_multipliers = {'BPSK63' : 1.0, 'PSK125R' : 0.6, 'PSK250R' : 0.6, 'PSK500R' : 0.15}
     # synchronize between radio_send and radio_recv to avoid collisions; states are 'RX', 'TX', or 'IDLE'
@@ -116,6 +116,8 @@ class fl_instance:
         rx_prefix = bytes()
         rx_prefix_check = False
         rx_fragment = bytes()
+        rx_idle_counter = 0
+        rx_idle_counter_limit = 5
         while (True):
             await trio.sleep(self.recv_poll)
             # ignore received data while radio is busy
@@ -141,13 +143,20 @@ class fl_instance:
                     break
             # reset radio state at end of each poll
             else:
-                print("no received data, switching radio back to IDLE")
-                await self.radio_state_semaphore.acquire()
-                self.radio_state = 'IDLE'
-                self.radio_state_semaphore.release()
+                if (rx_msg != bytes() and rx_idle_counter < rx_idle_counter_limit):
+                    print("In middle of an RX, waiting to confirm end")
+                    rx_idle_counter += 1
+                    continue
+                else:
+                    print("no received data, switching radio back to IDLE")
+                    rx_idle_counter = 0
+                    await self.radio_state_semaphore.acquire()
+                    self.radio_state = 'IDLE'
+                    self.radio_state_semaphore.release()
         self.fl_client.text.clear_rx()
-        # RX complete, reset radio state
+        # RX complete; sleep to block a follow-up TX then reset radio state
         print("finishing receiving data, switching radio back to IDLE")
+        await trio.sleep(self.recv_poll)
         await self.radio_state_semaphore.acquire()
         self.radio_state = 'IDLE'
         self.radio_state_semaphore.release()
