@@ -124,6 +124,63 @@ NOTE: check which ports are already in use before assigning any here; this test 
 * Terminal 3 shows packets being received over fldigi, converted back to binary, and sent back out
 * Terminal 2 shows the test server connecting to each end of the proxy, sending packets, and then receiving the packets
 
+### Using with lnproxy
+
+#### Lnproxy setup
+
+* Clone the [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
+* Follow the setup instructions
+* Start a 2 node lnproxy setup using:
+
+```bash
+# Source the helper scripts and start bitcoind/lightning nodes
+source /path/to/lightning/contrib/startup_script_2.sh
+start_ln
+# Add the other node to each node's router
+l1-cli add-node $(l2-cli gid) $(l2-cli getinfo | jq .id)
+l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)
+```
+
+After you run `l2-cli add-node...` note the listening port connections from that node should connect in to.
+
+#### Fldigi setup
+
+* Follow the instructions in the 'Fldigi initialization' and 'Audio loopback' sections
+* Open a new terminal (Terminal 0) and start fldigi, which will be used for the first proxy instance
+
+`fldigi --config-dir config_fldigi --arq-server-port 22446 --xmlrpc-server-port 44668`
+
+* Open a new terminal (Terminal 1) and start a second fldigi instance
+
+`fldigi --config-dir config_fldigi --arq-server-port 33557 --xmlrpc-server-port 55779`
+
+#### fldigi-proxy setup
+
+* Open a new terminal (Terminal 2) and start the proxy that node1 from lnproxy will connect to (can use any free port)
+
+`./fldigi_proxy.py --xml 44668 --proxyport 56789 --proxy_out`
+
+* Open a new terminal (Terminal 3) and start the proxy that will connect to node2 from lnproxy
+  * NOTE: must use the port given by `l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)`
+
+`./fldigi_proxy.py --xml 55779 --proxyport 99999`
+
+#### Closing the loop
+
+* Switch back to the lnproxy window, where we previously sourced the lightning helper commands:
+
+```bash
+# NOTE: the tcp port here MUST match that used above in the "--proxy_out" parameter
+l1-cli proxy-connect $(l2-cli gid) 56789
+
+# Once the connection is complete
+l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
+bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
+
+# Now we have a channel, make a payment
+l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
+```
+
 ### Planned changes
 
 * set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
