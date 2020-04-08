@@ -22,16 +22,20 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 * Install Python 3.8
 * Install pavucontrol (to set sink & source for fldigi)
 * Install [fldigi](http://www.w1hkj.com/) (present in most distribution repos)
+* Initialize and use a venv for Python dependencies
 * Use pip3 to install [pyfldigi](https://pythonhosted.org/pyfldigi/index.html) and [trio](https://trio.readthedocs.io/en/stable/)
-  * NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4 - some functions like main.send(), receive(), and transmit() have been removed
-* Make two directories which will be used to store fldigi config data
+  * NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4
+* Make a directory which will be used to store fldigi config data
 
 ````bash
 git clone https://github.com/jharveyb/fldigi-proxy.git
 cd fldigi-proxy
 sudo apt-get install python3.8 pavucontrol fldigi
-pip3 install pyfldigi trio
-mkdir sender_config
+python3.8 -m venv venv
+source venv/bin/activate
+pip3.8 install --upgrade pip
+pip3.8 install -r requirements.txt
+mkdir fldigi_config
 ````
 
 ### Fldigi initialization
