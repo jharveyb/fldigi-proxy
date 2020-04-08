@@ -137,14 +137,14 @@ After you run `l2-cli add-node...` note the listening port connections from that
 
 * Next we will start fldigi and fldigi-proxy
 
-*  Using the fldigi_config dir created earlier in (#Install-dependencies)
+*  Using the config_fldigi dir created earlier in (#Install-dependencies)
 
 ```bash
 cd /path/to/fldigi-proxy/
 # Start two fldigi instances using based on that config
-fldigi --config-dir fldigi_config
+fldigi --config-dir config_fldigi
 # (in a second terminal window)
-fldigi --config-dir fldigi_config --arq-server-port 7323 --xmlrpc-server-port 7363
+fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
 #### Checking settings (optional) 
@@ -171,9 +171,9 @@ fldigi --config-dir fldigi_config --arq-server-port 7323 --xmlrpc-server-port 73
 
 ```bash
 # Start two fldigi instances
-fldigi --config-dir fldigi_config
+fldigi --config-dir config_fldigi
 # (in a second terminal window)
-fldigi --config-dir fldigi_config --arq-server-port 7323 --xmlrpc-server-port 7363
+fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
 ### Fldigi-proxy setup
