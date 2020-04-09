@@ -63,7 +63,7 @@ mkdir config_fldigi
 * Test the audio loopback by playing some music - you should see output in the waterfall panel at the bottom of the fldigi GUI
   * In pavucontrol, the bars in the Playback and Recording tabs should be in sync
 
-#### OS X
+#### MacOS
 
 * You should be able to set up an audio loopback when fldigi is using PortAudio
   * This [LOOPBACK](https://rogueamoeba.com/loopback/) program has been tested and successfully used
@@ -82,51 +82,40 @@ mkdir config_fldigi
 #### Examples
 
 ````bash
-# Make an outbound connection for TCP proxy, attatching to an fldigi instance listening on 44668, and accepting data on port 8822
+# Listen for an *inbound* connection on port 8822, attach to an fldigi instance listening on xml port 7362
 # Radio settings are unspecified so default to transceiver mode = USB, carrier = 1500 Hz, modem = PSK125R
-./fldigi-proxy.py --xml 44668 --proxyport 8822
-# Same proxy settings as above, but change fldigi radio-specific settings on startup
-./fldigi-proxy.py --xml 44668 --proxyport 8822 --rigmode 'CW' --carrier 2000 --modem 'PSK500R'
+./fldigi_proxy.py --xml 7362 --proxy_out 8822
+
+# Make an *outbound* connection to remote TCP port 2288, change some fldigi radio-specific settings on startup
+./fldigi_proxy.py --xml 7362  --proxy_in 2288 --modem 'PSK125R' --rigmode 'CW' --carrier 1500
 ````
 
 ### TCP proxy test
 
-NOTE: check which ports are already in use before assigning any here; this test requires 6.
+NOTE: check which ports are already in use before assigning any here.
 
-* Open a new terminal (Terminal 0) and start fldigi, which will be used for the first proxy instance
+* Open a new terminal (Terminal 0) and start first fldigi
 
-`fldigi --config-dir config_fldigi --arq-server-port 22446 --xmlrpc-server-port 44668`
+`fldigi --config-dir config_fldigi`
 
-* Open a new terminal (Terminal 1) and start a second fldigi instance
+* Open a new terminal (Terminal 1) and start second fldigi
 
-`fldigi --config-dir config_fldigi --arq-server-port 33557 --xmlrpc-server-port 55779`
+`fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363`
 
-* Open a new terminal (Terminal 2) and attach a proxy to the first fldigi instance
+* Open a new terminal (Terminal 2) and start the TCP test server
+  * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham)
 
-`./fldigi-proxy.py --xml 44668 --proxyport 2288 --proxy-out`
-
-* Open a new terminal (Terminal 3) and start the proxy that will send the initial packets
-
-`./fldigi-proxy.py --xml 55779 --proxyport 8822 --proxy-out`
-
-* Open a new terminal (Terminal 4) and start the test server
-  * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham), and then echoes them back over the radio
-
-`./tcp_tester.py --inport 8822 --outport 2288`
+`./tcp_tester.py --auto`
 
 * After a short delay, packets should start flowing from the test server to the sending proxy
+
 * sent via fldigi to the listening proxy, and sent back to the test server, which checks that the packets match
-* the listening proxy should also echo packets back to the sending proxy, where they should also match
 
-#### Debug messages
+* Upon success, you will note `Successful echo over proxy!` and `server finished` in the logs.
 
-* Terminal 2 shows packets being received, queued, and then converted to base64 and sent over fldigi
-* Terminal 3 shows packets being received over fldigi, converted back to binary, and sent back out
-* Terminal 4 shows the test server connecting to each end of the proxy, sending packets, and then receiving the packets
+## Using with lnproxy
 
-### Using with lnproxy
-
-#### Lnproxy setup
+### Lnproxy setup
 
 * Clone the [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
 * Follow the setup instructions
@@ -143,35 +132,64 @@ l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)
 
 After you run `l2-cli add-node...` note the listening port connections from that node should connect in to.
 
-#### Fldigi setup
+### Fldigi setup
 
-* Follow the instructions in the 'Fldigi initialization' and 'Audio loopback' sections
-* Open a new terminal (Terminal 0) and start fldigi, which will be used for the first proxy instance
+* Next we will start fldigi and fldigi-proxy using the config_fldigi dir created earlier in (#Install-dependencies)
 
-`fldigi --config-dir config_fldigi --arq-server-port 22446 --xmlrpc-server-port 44668`
+```bash
+cd /path/to/fldigi-proxy/
+# Start two fldigi instances using based on that config
+fldigi --config-dir config_fldigi
+# (in a second terminal window)
+fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
+```
 
-* Open a new terminal (Terminal 1) and start a second fldigi instance
+#### Checking settings (optional)
 
-`fldigi --config-dir config_fldigi --arq-server-port 33557 --xmlrpc-server-port 55779`
+* You can check the settings for the two fldigi instances using the GUI if you choose:
 
-#### fldigi-proxy setup
+* Check your soundcard is configured to use your loopback device, `Config > config dialogue > Soundcard > Devices`:
 
-* Open a new terminal (Terminal 2) and start the proxy that node1 from lnproxy will connect to (can use any free port)
+![soundcard_loopback](/assets/soundcard.png)
 
-`./fldigi_proxy.py --xml 44668 --proxyport 56789 --proxy_out`
+* Save and close the config dialogue. If you had to make any corrections, you need to restart,  `File > Exit` from the menu, to implement the changes.
 
-* Open a new terminal (Terminal 3) and start the proxy that will connect to node2 from lnproxy
-  * NOTE: must use the port given by `l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)`
+* Again, save and quit second fldigi window if you had to make any changes.
 
-`./fldigi_proxy.py --xml 55779 --proxyport 99999`
+* If you made changes, restart both fldigi instances again using the same commands as before:
 
-#### Closing the loop
+```bash
+# Start two fldigi instances
+fldigi --config-dir config_fldigi
+# (in a second terminal window)
+fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
+```
 
-* Switch back to the lnproxy window, where we previously sourced the lightning helper commands:
+### Fldigi-proxy setup
+
+* With 2x fldigi running, we can now connect fldigi-proxy to them. We need two more terminal windows for this:
+
+```bash
+cd /path/to/fldigi_proxy/
+
+# In first window, this will connect to node1 who will make the outbound connection.
+# --proxy_out is the port we listen on for this outbound connection from C-Lightning
+./fldigi_proxy.py --xml 7362 --proxy_out 55555
+
+# In second window. This will connect the inbound connection to C-Lightning
+# YOU MUST change the --proxy_in port argument to match the value returned when you ran
+# l2-cli add-node... command from Lnproxy Setup section above!
+./fldigi_proxy.py --xml 7363 --proxy_in 99999
+```
+
+### Connecting together
+
+* With 2 x fldigi + fldigi-proxy running, and two lightning nodes running with Lnproxy plugin enabled, we are ready to connect them together over the radio (ok, loopback soundcard device)!
+* Back in the lnproxy window, where we previously sourced the lightning helper commands:
 
 ```bash
 # NOTE: the tcp port here MUST match that used above in the "--proxy_out" parameter
-l1-cli proxy-connect $(l2-cli gid) 56789
+l1-cli proxy-connect $(l2-cli gid) 55555
 
 # Once the connection is complete
 l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
@@ -181,8 +199,10 @@ bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
 l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
 ```
 
+* Complete
+
 ### Planned changes
 
-* set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
+* set default modem based on medium via flag, i.e. PSK500R for 'audio loopback', PSK125R for real radio
   * Calculate polling delays and other timeouts based on the modem baud rate
-* add either ARQ support or FEC wrapping for more reliable transmission
+* add ARQ support to allow retransmit support
