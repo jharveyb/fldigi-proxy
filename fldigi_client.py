@@ -1,3 +1,7 @@
+"""
+fl_instance used to interface with fldigi via pyfldigi and the fldigi XML-RPC server
+"""
+
 import logging
 import time
 from collections import deque

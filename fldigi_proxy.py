@@ -1,4 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.8
+
+"""
+Proxy TCP/IP connections over a radio via fldigi, and change
+basic settings in fldigi to better send packets vs. text
+"""
+
 import logging
 from collections import deque
 from functools import partial

@@ -1,10 +1,9 @@
-import argparse
-import codecs
-
-"""Test starting of fldigi, text encode/decode, and accepting messages to pass to fldigi
-over a TCP/IP socket
+"""
+Global utilities for data encode/decode + tests for fldigi-proxy <-> fldigi interface
 """
 
+import argparse
+import codecs
 
 # Convert raw data in a bytes() object to base64 for radio TX
 def raw_to_base64(raw_bytes, prefix=b"BTC"):
