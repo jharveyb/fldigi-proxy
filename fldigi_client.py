@@ -34,12 +34,12 @@ class fl_instance:
     # we assume no port collisions for KISS, ARQ, or XMLRPC ports
     # TODO: check ports before starting
     def __init__(
-        self,
-        no_proxy=False,
-        host=host_ip,
-        xml_port=xml_port,
-        proxy_in=None,
-        proxy_out=None,
+            self,
+            no_proxy=False,
+            host=host_ip,
+            xml_port=xml_port,
+            proxy_in=None,
+            proxy_out=None,
     ):
         self.host_ip = host
         if xml_port is not None:
@@ -179,12 +179,10 @@ class fl_instance:
             self.fl_client.modem.carrier = carrier
             self.fl_client.main.afc = False
         if (
-            modem is not None
-            and modem != ""
-            and self.fl_client.modem.names.count(modem) == 1
+                modem is not None
+                and modem != ""
+                and self.fl_client.modem.names.count(modem) == 1
         ):
-            if modem[0:4] == "BPSK":
-                self.fl_client.modem.name = modem
             self.fl_client.modem.name = modem
 
     def stop(self):

@@ -89,7 +89,7 @@ async def main():
         proxy_in=args.proxy_in,
         proxy_out=args.proxy_out,
     )
-    util.print_fl_stats(fl_main, args)
+    util.fl_radio_settings(fl_main, args)
 
     ####################################################################################
     # TCP proxy mode

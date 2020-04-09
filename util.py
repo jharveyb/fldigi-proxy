@@ -89,7 +89,7 @@ def parse_args():
     return args
 
 
-def print_fl_stats(fl_main, args):
+def fl_radio_settings(fl_main, args):
     print(fl_main.version())
     fl_main.port_info()
     fl_main.rig_info()
