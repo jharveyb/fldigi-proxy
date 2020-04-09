@@ -113,7 +113,6 @@ NOTE: check which ports are already in use before assigning any here.
 
 * Upon success, you will note `Successful echo over proxy!` and `server finished` in the logs.
 
-
 ## Using with lnproxy
 
 ### Lnproxy setup
@@ -135,9 +134,7 @@ After you run `l2-cli add-node...` note the listening port connections from that
 
 ### Fldigi setup
 
-* Next we will start fldigi and fldigi-proxy
-
-*  Using the config_fldigi dir created earlier in (#Install-dependencies)
+* Next we will start fldigi and fldigi-proxy using the config_fldigi dir created earlier in (#Install-dependencies)
 
 ```bash
 cd /path/to/fldigi-proxy/
@@ -147,7 +144,7 @@ fldigi --config-dir config_fldigi
 fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
 ```
 
-#### Checking settings (optional) 
+#### Checking settings (optional)
 
 * You can check the settings for the two fldigi instances using the GUI if you choose:
 
@@ -155,18 +152,10 @@ fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 73
 
 ![soundcard_loopback](/assets/soundcard.png)
 
-* next check ARQ and xml settings, `Config > config dialogue > Misc > TCP Settings`:
-* Now set this node (node1)'s settings like so. Note that ARQ is enabled
-
-![node1_tcp](/assets/node1_tcp.png)
-
 * Save and close the config dialogue. If you had to make any corrections, you need to restart,  `File > Exit` from the menu, to implement the changes.
-* Now repeat with the second node, this time using the following settings in `Config > config dialogue > Misc > TCP Settings`:
-
-![node2_tcp](/assets/node2_tcp.png)
 
 * Again, save and quit second fldigi window if you had to make any changes.
- 
+
 * If you made changes, restart both fldigi instances again using the same commands as before:
 
 ```bash
@@ -185,12 +174,12 @@ cd /path/to/fldigi_proxy/
 
 # In first window, this will connect to node1 who will make the outbound connection.
 # --proxy_out is the port we listen on for this outbound connection from C-Lightning
-./fldigi_proxy.py --xml 7362 --modem 'PSK125R' --carrier 1500 --proxy_out 55555
+./fldigi_proxy.py --xml 7362 --proxy_out 55555
 
 # In second window. This will connect the inbound connection to C-Lightning
 # YOU MUST change the --proxy_in port argument to match the value returned when you ran
 # l2-cli add-node... command from Lnproxy Setup section above!
-./fldigi_proxy.py --xml 7363 --modem 'PSK125R' --carrier 1500 --proxy_in 99999
+./fldigi_proxy.py --xml 7363 --proxy_in 99999
 ```
 
 ### Connecting together
@@ -212,9 +201,8 @@ l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 1
 
 * Complete
 
-
 ### Planned changes
 
-* set default modem based on medium via flag, i.e. BPSK125+ for 'audio loopback', BPSK31 for real radio
+* set default modem based on medium via flag, i.e. PSK500R for 'audio loopback', PSK125R for real radio
   * Calculate polling delays and other timeouts based on the modem baud rate
-* add either ARQ support or FEC wrapping for more reliable transmission
+* add ARQ support to allow retransmit support
