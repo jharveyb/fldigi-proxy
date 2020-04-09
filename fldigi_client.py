@@ -108,11 +108,13 @@ class fl_instance:
 
     async def get_fragment(self):
         await trio.sleep(self.poll_delay)
-        fragment = self.fl_client.text.get_rx_data().strip(b" ")
-        if fragment is not b"":
+        fragment = self.fl_client.text.get_rx_data()
+        if isinstance(fragment, bytes) and fragment is not b"":
             logger.info(f"Got fragment: {fragment}")
             self.last_recv = time.time()
-        return fragment
+            return fragment.replace(b" ", b"")
+        else:
+            return b""
 
     # received content is raw bytes, newline-terminated
     async def radio_receive(self):
