@@ -195,8 +195,17 @@ l1-cli proxy-connect $(l2-cli gid) 55555
 l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
 bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
 
-# Now we have a channel, make a payment
+# ----
+# Now we have a channel, we can make a payment
+# ----
+
+# To make a payment between two local nodes for testing, we can use the following to pass in an invoice, from node l2, to pay to:
 l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
+
+# Otherwise we can use Lnproxy's (encrypted) `message` RPC command to send a "spontaneous send" style payment, where no invoice is required upfront:
+l1-cli message $(l2-cli gid) $(openssl rand -hex 12) 100000
+# or with custom encrypted message:
+l1-cli message $(l2-cli gid) your_message_here 100000
 ```
 
 * Complete
