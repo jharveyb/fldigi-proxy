@@ -1,2 +1,2 @@
 trio==0.13.0
-pyfldigi==0.4
+git+git://github.com/willcl-ark/pyFldigi@master#egg=pyfldigi
