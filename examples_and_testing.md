@@ -1,4 +1,14 @@
-#### Examples
+## Running fldigi-proxy
+
+* fldigi-proxy will not run without any flags, and running in TCP proxy mode requires the proxy ports to be listening before start
+* The relevant flags for running in TCP proxy mode are daemon, xml, proxyport, and proxy_out
+  * by default, fldigi-proxy will attach to an fldigi instance with an XML-RPC interface open
+    * fldigi-proxy can also start its own fldigi instance, but this uses the system config dir
+  * proxy_out sets the mode for the proxy port between expecting an inbound or outbound connection
+    * The default is to make an outbound connection; setting proxy_out means the proxy will expect to receive an outbound connection
+  * The nohead, rigmode, carrier, modem settings can be set independently of the other flags that change proxy or test behavior
+
+## Examples
 
 ````bash
 # Listen for an *inbound* connection on port 8822, attach to an fldigi instance listening on xml port 7362
@@ -9,7 +19,7 @@
 ./fldigi_proxy.py --xml 7362  --proxy_in 2288 --modem 'PSK125R' --rigmode 'CW' --carrier 1500
 ````
 
-### TCP proxy test
+## TCP proxy test
 
 NOTE: check which ports are already in use before assigning any here.
 
