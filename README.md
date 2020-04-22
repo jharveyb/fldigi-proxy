@@ -19,40 +19,51 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 
 ### Install dependencies
 
-* Install Python
-* Install pavucontrol (to set sink & source for fldigi)
-* Install [fldigi](http://www.w1hkj.com/) (present in most distribution repos)
-  * NOTE: On OS X, you may need to add a symlink for pyfldigi to find your fldigi installation, ex.
-  * `sudo ln -s /Applications/fldigi-4.1.11.app/Contents/MacOS/fldigi /usr/local/bin`
-* Initialize and use a venv for Python dependencies
-* Use pip3 to install [pyfldigi](https://pythonhosted.org/pyfldigi/index.html) and [trio](https://trio.readthedocs.io/en/stable/)
-  * NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4
-  * NOTE: If running on OS X, you'll need to remove the platform check in pyfldigi
-    * Specifically on line 31 of appmonitor.py
-* Make a directory which will be used to store fldigi config data
+* Install Python => 3.7
+
+Check NOTEs below install instructions
 
 ````bash
+# MacOS: install fldigi manually from http://www.w1hkj.com/
+sudo apt install pavucontrol fldigi # Unix only
+
+# Clone this repo
 git clone https://github.com/jharveyb/fldigi-proxy.git
 cd fldigi-proxy
 git checkout sync-timer
-sudo apt install pavucontrol fldigi
+
+# Initialize and use a venv for Python dependencies
 python3 -m venv venv
 source venv/bin/activate
+
+# Install python dependencies
 pip3 install --upgrade pip
 pip3 install -r requirements.txt
+
+# Make a directory which will be used to store fldigi config data
 mkdir config_fldigi
 ````
+
+* NOTE: On MacOS, you may need to add a symlink for pyfldigi to find your fldigi installation, ex:
+  * `sudo ln -s /Applications/fldigi-4.1.11.app/Contents/MacOS/fldigi /usr/local/bin`
+
+* NOTE: The pyfldigi docs are for 0.3, but the version provided by pip3 is 0.4
+
+* NOTE: If on MacOS and you *don't* install pyfldigi from requirements.txt (which uses a patched version), you'll need to remove the platform check in pyfldigi on line 31 of appmonitor.py
 
 ### Fldigi initialization
 
 * Start fldigi with --config-dir flag to initialize the configuration
-  * Even though we don't use the fldigi ARQ interface, we need the two fldigi instances to not collide on those ports
 
-`fldigi --config-dir config_fldigi`
+```bash
+fldigi --config-dir config_fldigi
+```
+
 
 * Skip the first page of the initial setup
 * On the second page (Audio), select PulseAudio (or PortAudio if not on Linux); leave the server field empty if using PulseAudio
-* Skip the remaining setup pages; fldigi should start, buts needs to be restarted to save the audio settings
+* Skip the remaining setup pages
+* fldigi should start, *but needs to be restarted once* to save the audio device settings
 
 ### Audio loopback
 
@@ -70,37 +81,32 @@ mkdir config_fldigi
   * This [LOOPBACK](https://rogueamoeba.com/loopback/) program has been tested and successfully used
 * Test the audio loopback by playing some music - you should see output in the waterfall panel at the bottom of the fldigi GUI
 
-### Running fldigi-proxy
 
-* fldigi-proxy will not run without any flags, and running in TCP proxy mode requires the proxy ports to be listening before start
-* The relevant flags for running in TCP proxy mode are daemon, xml, proxyport, and proxy_out
-  * by default, fldigi-proxy will attach to an fldigi instance with an XML-RPC interface open
-    * fldigi-proxy can also start its own fldigi instance, but this uses the system config dir
-  * proxy_out sets the mode for the proxy port between expecting an inbound or outbound connection
-    * The default is to make an outbound connection; setting proxy_out means the proxy will expect to receive an outbound connection
-  * The nohead, rigmode, carrier, modem settings can be set independently of the other flags that change proxy or test behavior
-
-
-## Using with lnproxy, single node
+## Using with lnproxy; single node; testnet (default)
 
 ### Lnproxy setup
 
-* Follow the install instructions to install [Lnproxy](https://github.com/willcl-ark/lnproxy) including cloning an compiling the custom C-Lightning branch with patches included
+* Follow the install instructions to install [Lnproxy](https://github.com/willcl-ark/lnproxy) including cloning and compiling the custom C-Lightning branch with patches and configured using the `--enable-developer` flag.
 
 
 ```bash
-# From the c-lightning source directory cloned above, source the helper scripts
-source /path/to/lightning/contrib/startup_testnet1.sh
+# From the c-lightning source directory as cloned above, source the helper scripts
+source contrib/startup_testnet1.sh
 
 # Start C-Lightning
 start_ln
 ```
 
-Here the instructions diverge slightly depending on who will make the outbound connection. We will call outbound connector "A" and connection receiver "B". "A" should follow this section, "B" should skip to the B section below:
+Here the instructions diverge depending on who will make the _outbound_ connection. We will use terms:
 
-### A - outbound connector
+* Outbound (initiating connection)
+* Inbound (receiving connection)
 
-A is making the outbound connection. Let's export an environment variable:
+The initiator should follow the section immediately below [Outbound](#outbound), and the receiver should skip to the [Inbound](#inbound) section below:
+
+### Outbound
+
+Let's export an environment variable to help us later:
 
 ```bash
 export FLD_PORT=55555
@@ -140,7 +146,7 @@ l1-cli pay <bolt11_invoice>
 l1-cli message <remote_pubkey> your_message_here <amount_msat>
 ```
 
-### B - inbound connector
+### Inbound
 
 B is receiving the inbound connection. Let's export an environment variable:
 
