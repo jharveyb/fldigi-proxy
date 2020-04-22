@@ -11,7 +11,7 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 
 ## Dependencies
 
-* Python 3.8
+* Python >= 3.7
 * pavucontrol (or similar) and fldigi
 * pyfldigi and trio
 
@@ -19,7 +19,7 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 
 ### Install dependencies
 
-* Install Python 3.8
+* Install Python
 * Install pavucontrol (to set sink & source for fldigi)
 * Install [fldigi](http://www.w1hkj.com/) (present in most distribution repos)
   * NOTE: On OS X, you may need to add a symlink for pyfldigi to find your fldigi installation, ex.
@@ -34,17 +34,18 @@ Proxy between TCP/IP sockets over fldigi (HAM radio controller)
 ````bash
 git clone https://github.com/jharveyb/fldigi-proxy.git
 cd fldigi-proxy
-sudo apt-get install python3.8 pavucontrol fldigi
-python3.8 -m venv venv
+git checkout sync-timer
+sudo apt install pavucontrol fldigi
+python3 -m venv venv
 source venv/bin/activate
-pip3.8 install --upgrade pip
-pip3.8 install -r requirements.txt
+pip3 install --upgrade pip
+pip3 install -r requirements.txt
 mkdir config_fldigi
 ````
 
 ### Fldigi initialization
 
-* Start fldigi with config_fldigi the config_dir to initialize the configuration
+* Start fldigi with --config-dir flag to initialize the configuration
   * Even though we don't use the fldigi ARQ interface, we need the two fldigi instances to not collide on those ports
 
 `fldigi --config-dir config_fldigi`
@@ -79,136 +80,95 @@ mkdir config_fldigi
     * The default is to make an outbound connection; setting proxy_out means the proxy will expect to receive an outbound connection
   * The nohead, rigmode, carrier, modem settings can be set independently of the other flags that change proxy or test behavior
 
-#### Examples
 
-````bash
-# Listen for an *inbound* connection on port 8822, attach to an fldigi instance listening on xml port 7362
-# Radio settings are unspecified so default to transceiver mode = USB, carrier = 1500 Hz, modem = PSK125R
-./fldigi_proxy.py --xml 7362 --proxy_out 8822
-
-# Make an *outbound* connection to remote TCP port 2288, change some fldigi radio-specific settings on startup
-./fldigi_proxy.py --xml 7362  --proxy_in 2288 --modem 'PSK125R' --rigmode 'CW' --carrier 1500
-````
-
-### TCP proxy test
-
-NOTE: check which ports are already in use before assigning any here.
-
-* Open a new terminal (Terminal 0) and start first fldigi
-
-`fldigi --config-dir config_fldigi`
-
-* Open a new terminal (Terminal 1) and start second fldigi
-
-`fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363`
-
-* Open a new terminal (Terminal 2) and start the TCP test server
-  * the test server sends four short binary packets captured from a node handshake in [lnproxy](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham)
-
-`./tcp_tester.py --auto`
-
-* After a short delay, packets should start flowing from the test server to the sending proxy
-
-* sent via fldigi to the listening proxy, and sent back to the test server, which checks that the packets match
-
-* Upon success, you will note `Successful echo over proxy!` and `server finished` in the logs.
-
-## Using with lnproxy
+## Using with lnproxy, single node
 
 ### Lnproxy setup
 
-* Clone the [2020-02-23](https://github.com/willcl-ark/lnproxy/tree/2020-02-23-ham) branch of lnproxy
-* Follow the setup instructions
-* Start a 2 node lnproxy setup using:
+* Follow the install instructions to install [Lnproxy](https://github.com/willcl-ark/lnproxy) including cloning an compiling the custom C-Lightning branch with patches included
+
 
 ```bash
-# Source the helper scripts and start bitcoind/lightning nodes
-source /path/to/lightning/contrib/startup_script_2.sh
+# From the c-lightning source directory cloned above, source the helper scripts
+source /path/to/lightning/contrib/startup_testnet1.sh
+
+# Start C-Lightning
 start_ln
-# Add the other node to each node's router
-l1-cli add-node $(l2-cli gid) $(l2-cli getinfo | jq .id)
-l2-cli add-node $(l1-cli gid) $(l1-cli getinfo | jq .id)
 ```
 
-After you run `l2-cli add-node...` note the listening port connections from that node should connect in to.
+Here the instructions diverge slightly depending on who will make the outbound connection. We will call outbound connector "A" and connection receiver "B". "A" should follow this section, "B" should skip to the B section below:
 
-### Fldigi setup
+### A - outbound connector
 
-* Next we will start fldigi and fldigi-proxy using the config_fldigi dir created earlier in (#Install-dependencies)
+A is making the outbound connection. Let's export an environment variable:
 
 ```bash
+export FLD_PORT=55555
+```
+
+We can add the remote node to the Lnproxy router. The final `11111` (listening port) is not important for "A" because it will make outbound connection, but a valid port number is still required here:
+
+```bash
+l1-cli add-node <remote_pubkey>@127.0.0.1:$FLD_PORT 11111
+```
+
+Let's start main `fldigi` and also `fldigi-proxy` listening on a port ready for us:
+
+```bash
+# To start fldigi main app:
 cd /path/to/fldigi-proxy/
-# Start two fldigi instances using based on that config
+# Start fldigi instances using based on that config
 fldigi --config-dir config_fldigi
-# (in a second terminal window)
-fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
+
+# Now in a new terminal window start fldigi-proxy:
+cd /path/to/fldigi-proxy/
+./fldigi_proxy.py --xml 7362 --proxy_out $FLD_PORT
 ```
 
-#### Checking settings (optional)
-
-* You can check the settings for the two fldigi instances using the GUI if you choose:
-
-* Check your soundcard is configured to use your loopback device, `Config > config dialogue > Soundcard > Devices`:
-
-![soundcard_loopback](/assets/soundcard.png)
-
-* Save and close the config dialogue. If you had to make any corrections, you need to restart,  `File > Exit` from the menu, to implement the changes.
-
-* Again, save and quit second fldigi window if you had to make any changes.
-
-* If you made changes, restart both fldigi instances again using the same commands as before:
+When you have confirmation that your counter-party, "B" is also setup with fldigi, _you_ can begin the connecting sequence:
 
 ```bash
-# Start two fldigi instances
+l1-cli proxy-connect <remote_pubkey>
+
+# Once connected, you can follow additional C-Lightning/Lnproxy commands, e.g.:
+l1-cli fundchannel <remote_pubkey> 1000000 10000 false
+
+# To pay an invoice first acquire an invoice out of band, then:
+l1-cli pay <bolt11_invoice>
+
+# We can use Lnproxy's (encrypted) `message` RPC command to send a "spontaneous send" style payment, where no invoice is required upfront:
+l1-cli message <remote_pubkey> your_message_here <amount_msat>
+```
+
+### B - inbound connector
+
+B is receiving the inbound connection. Let's export an environment variable:
+
+```bash
+export FLD_PORT=22222
+```
+
+We can add the remote node to the Lnproxy router. The port `22222` (listening port of A) is not important for "B" because it will make receive inbound connection on $FLD_PORT, but a valid port number is still required:
+
+```bash
+l1-cli add-node <remote_pubkey>@127.0.0.1:22222 $FLD_PORT
+```
+
+Let's start main `fldigi` and also `fldigi-proxy` and tell fldigi-proxy which port to proxy to when it receives a signal from fldigi:
+
+```bash
+# To start fldigi main app:
+cd /path/to/fldigi-proxy/
+# Start fldigi based on that config
 fldigi --config-dir config_fldigi
-# (in a second terminal window)
-fldigi --config-dir config_fldigi --arq-server-port 7323 --xmlrpc-server-port 7363
+
+# Now in a new terminal window
+cd /path/to/fldigi-proxy/
+./fldigi_proxy.py --xml 7362 --proxy_in $FLD_PORT
 ```
 
-### Fldigi-proxy setup
+Wait for incoming connection from the radio
 
-* With 2x fldigi running, we can now connect fldigi-proxy to them. We need two more terminal windows for this:
-
-```bash
-cd /path/to/fldigi_proxy/
-
-# In first window, this will connect to node1 who will make the outbound connection.
-# --proxy_out is the port we listen on for this outbound connection from C-Lightning
-./fldigi_proxy.py --xml 7362 --proxy_out 55555
-
-# In second window. This will connect the inbound connection to C-Lightning
-# YOU MUST change the --proxy_in port argument to match the value returned when you ran
-# l2-cli add-node... command from Lnproxy Setup section above!
-./fldigi_proxy.py --xml 7363 --proxy_in 99999
-```
-
-### Connecting together
-
-* With 2 x fldigi + fldigi-proxy running, and two lightning nodes running with Lnproxy plugin enabled, we are ready to connect them together over the radio (ok, loopback soundcard device)!
-* Back in the lnproxy window, where we previously sourced the lightning helper commands:
-
-```bash
-# NOTE: the tcp port here MUST match that used above in the "--proxy_out" parameter
-l1-cli proxy-connect $(l2-cli gid) 55555
-
-# Once the connection is complete
-l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
-bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
-
-# ----
-# Now we have a channel, we can make a payment
-# ----
-
-# To make a payment between two local nodes for testing, we can use the following to pass in an invoice, from node l2, to pay to:
-l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
-
-# Otherwise we can use Lnproxy's (encrypted) `message` RPC command to send a "spontaneous send" style payment, where no invoice is required upfront:
-l1-cli message $(l2-cli gid) $(openssl rand -hex 12) 100000
-# or with custom encrypted message:
-l1-cli message $(l2-cli gid) your_message_here 100000
-```
-
-* Complete
 
 ### Planned changes
 
