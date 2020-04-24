@@ -79,18 +79,17 @@ class fl_instance:
                 await trio.sleep(self.poll_delay)
             # Got something to send
             else:
-                # Some sleeps to try and avoid transmitting at same time
-                # If we last sent, sleep longer to be polite!
-                if self.last_send > self.last_recv:
-                    delay = 10
-                    logger.debug(f"Waiting {delay}s before send as we sent last")
-                else:
+                # If we last sent, we get priority to continue transmit of multiple
+                # messages
+                if self.last_send >= self.last_recv:
                     delay = 5
-                    logger.debug(f"Waiting {delay}s before send as we received last")
+                else:
+                    delay = 12
+                logger.debug(f"Waiting {delay}s before next send")
                 await trio.sleep(delay)
                 # Make sure we didn't start receiving while we were sleeping
                 while self.last_recv + delay > time.time():
-                    await trio.sleep(self.poll_delay)
+                    await trio.sleep(0.5)
 
                 logger.info(f"Sending: {radio_buffer}")
                 # We actually use a long timeout because we might be receiving which
@@ -103,14 +102,15 @@ class fl_instance:
                     logger.exception(e)
                 logger.info(f"Sent: {radio_buffer}")
                 self.last_send = time.time()
-                self.fl_client.main.abort()
+                # self.fl_client.main.abort()
                 self.fl_client.main.rx()
+                self.clear_buffers()
 
     async def get_fragment(self):
         await trio.sleep(self.poll_delay)
         fragment = self.fl_client.text.get_rx_data()
         if isinstance(fragment, bytes) and fragment is not b"":
-            logger.info(f"Got fragment: {fragment}")
+            logger.info(f"RX fragment: {fragment}")
             self.last_recv = time.time()
             return fragment.replace(b" ", b"")
         else:
@@ -123,15 +123,14 @@ class fl_instance:
         # Didn't get anything
         if rx_msg is b"":
             return rx_msg
-        else:
-            while True:
-                rx_msg += await self.get_fragment()
-                # We've hit or gone past the end of one message.
-                # TODO: Extra bytes currently discarded
-                if self.base64_suffix in rx_msg:
-                    break
+        # Loop receiving fragments
+        while True:
+            rx_msg += await self.get_fragment()
+            # We've got to the end of message.
+            if self.base64_suffix in rx_msg:
+                break
         self.fl_client.text.clear_rx()
-        # Cleanup the message
+        # Cleanup the message and return it
         try:
             _start = rx_msg.index(self.base64_prefix)
             _end = rx_msg.index(self.base64_suffix)
@@ -148,6 +147,7 @@ class fl_instance:
             if radio_buffer:
                 logger.info(f"Received: {radio_buffer}")
                 packet_deque.append(radio_buffer)
+                self.clear_buffers()
 
     def rig_info(self):
         logger.info(
